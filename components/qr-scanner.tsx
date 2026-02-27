@@ -126,20 +126,38 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
       }
 
       // Start scanning loop using jsQR (works on all browsers)
+      let frameCount = 0;
+      let lastLogTime = Date.now();
+      
       const scan = () => {
         if (!scanningRef.current || !video || !canvas || !ctx) return;
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
+          // Use a reasonable canvas size for faster processing
+          const maxDimension = 640;
+          const scale = Math.min(maxDimension / video.videoWidth, maxDimension / video.videoHeight, 1);
+          canvas.width = Math.floor(video.videoWidth * scale);
+          canvas.height = Math.floor(video.videoHeight * scale);
+          
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Try multiple inversion attempts for better detection
           const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert",
+            inversionAttempts: "attemptBoth",
           });
 
+          frameCount++;
+          
+          // Log every 2 seconds for debugging
+          if (Date.now() - lastLogTime > 2000) {
+            console.log("[v0] QR Scanner: frames processed:", frameCount, "canvas size:", canvas.width, "x", canvas.height);
+            lastLogTime = Date.now();
+          }
+
           if (code && code.data) {
+            console.log("[v0] QR Code detected:", code.data);
             stopStream();
             onScan(code.data);
             return;
