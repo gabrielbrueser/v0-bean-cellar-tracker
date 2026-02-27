@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { QRCodeSVG, getVialQRUrl } from "@/components/qr-code";
-import { Package, ChevronRight, QrCode, Filter, ExternalLink } from "lucide-react";
+import { Package, ChevronRight, QrCode, Filter, ExternalLink, Layers } from "lucide-react";
 
 interface VialItem {
   id: string;
@@ -41,13 +41,23 @@ export default function InventoryPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6">
-      <header className="mb-4">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Inventory
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          All your doses in one place
-        </p>
+      <header className="mb-4 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Inventory
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            All your doses in one place
+          </p>
+        </div>
+        {emptyCount > 0 && (
+          <Link href="/batch-seal">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <Layers className="size-3.5" />
+              Batch Seal
+            </Button>
+          </Link>
+        )}
       </header>
 
       {/* Filter Toggle */}

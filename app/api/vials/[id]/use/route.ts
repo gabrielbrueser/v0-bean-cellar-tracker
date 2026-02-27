@@ -9,12 +9,16 @@ export async function POST(
   const { id: vialId } = await params;
   const sql = getDb();
 
-  // Parse request body for brew type
+  // Parse request body for brew type and grind size
   let brewType = "espresso"; // default
+  let grindSize: number | null = null;
   try {
     const body = await req.json();
     if (body.brewType) {
       brewType = body.brewType;
+    }
+    if (body.grindSize !== undefined && body.grindSize !== null) {
+      grindSize = Number(body.grindSize);
     }
   } catch {
     // No body or invalid JSON, use default
@@ -32,8 +36,8 @@ export async function POST(
   // Mark fill as USED
   await sql`UPDATE fill_sessions SET status = 'USED' WHERE id = ${fillSessionId}`;
 
-  // Log usage with brew method
-  await sql`INSERT INTO usage_logs (fill_session_id, brew_method) VALUES (${fillSessionId}, ${brewType})`;
+  // Log usage with brew method and grind size
+  await sql`INSERT INTO usage_logs (fill_session_id, brew_method, grind_size) VALUES (${fillSessionId}, ${brewType}, ${grindSize})`;
 
   // Mark vial as EMPTY
   await sql`UPDATE vials SET status = 'EMPTY' WHERE id = ${vialId}`;

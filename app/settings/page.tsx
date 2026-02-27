@@ -34,7 +34,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Coffee, Clock, Beaker, Trash2, TestTube, Settings2, Pencil, AlertTriangle } from "lucide-react";
+import { Coffee, Clock, Beaker, Trash2, TestTube, Settings2, Pencil, AlertTriangle, Printer } from "lucide-react";
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
 interface Activity {
@@ -187,7 +188,7 @@ export default function SettingsPage() {
             View, rename, and delete your doses
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-2">
           <Button
             variant="outline"
             className="w-full"
@@ -196,6 +197,12 @@ export default function SettingsPage() {
             <Settings2 className="size-4 mr-2" />
             Manage Doses ({vials?.length ?? 0})
           </Button>
+          <Link href="/print-labels">
+            <Button variant="outline" className="w-full">
+              <Printer className="size-4 mr-2" />
+              Print Label Cards
+            </Button>
+          </Link>
         </CardContent>
       </Card>
 

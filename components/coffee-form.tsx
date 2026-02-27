@@ -32,6 +32,17 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
   const [customProcess, setCustomProcess] = useState("");
   const [showScanner, setShowScanner] = useState(false);
 
+  const COFFEE_COLORS = [
+    { value: "amber", label: "Amber", class: "bg-amber-500" },
+    { value: "orange", label: "Orange", class: "bg-orange-500" },
+    { value: "red", label: "Red", class: "bg-red-500" },
+    { value: "pink", label: "Pink", class: "bg-pink-500" },
+    { value: "purple", label: "Purple", class: "bg-purple-500" },
+    { value: "blue", label: "Blue", class: "bg-blue-500" },
+    { value: "teal", label: "Teal", class: "bg-teal-500" },
+    { value: "green", label: "Green", class: "bg-green-500" },
+  ];
+
   const [form, setForm] = useState({
     roaster: coffee?.roaster ?? "Tanat",
     coffeeName: coffee?.coffeeName ?? "",
@@ -44,6 +55,7 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
     notes: coffee?.notes ?? "",
     link: coffee?.link ?? "",
     processMethodId: coffee?.processMethodId ?? "",
+    color: coffee?.color ?? "",
   });
 
   const handleChange = (field: string, value: string | number) => {
@@ -316,6 +328,40 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
           onChange={(e) => handleChange("link", e.target.value)}
           placeholder="https://..."
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Color Tag</Label>
+        <div className="flex flex-wrap gap-2">
+          {COFFEE_COLORS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onClick={() => handleChange("color", form.color === c.value ? "" : c.value)}
+              className={`
+                size-8 rounded-full transition-all
+                ${c.class}
+                ${form.color === c.value 
+                  ? "ring-2 ring-offset-2 ring-foreground scale-110" 
+                  : "opacity-60 hover:opacity-100"
+                }
+              `}
+              title={c.label}
+            />
+          ))}
+          {form.color && (
+            <button
+              type="button"
+              onClick={() => handleChange("color", "")}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Optional: assign a color to quickly identify this coffee
+        </p>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">

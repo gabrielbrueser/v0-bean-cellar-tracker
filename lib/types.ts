@@ -12,6 +12,8 @@ export interface Vial {
   qrValue: string;
   createdAt: Date;
   status: "FULL" | "EMPTY";
+  color: string | null;
+  archived: boolean;
 }
 
 export interface Coffee {
@@ -27,6 +29,8 @@ export interface Coffee {
   notes: string;
   link: string;
   processMethodId: string;
+  color: string | null;
+  archived: boolean;
   createdAt: Date;
 }
 
@@ -54,6 +58,7 @@ export interface UsageLog {
   fillSessionId: string;
   timestamp: Date;
   brewMethod: string;
+  grindSize?: number | null;
   notes: string;
 }
 

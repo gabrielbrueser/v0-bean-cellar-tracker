@@ -2,7 +2,8 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { useCoffee, useProcessMethods } from "@/lib/hooks";
+import { format, formatDistanceToNow } from "date-fns";
+import { useCoffee, useProcessMethods, useCoffeeTimeline } from "@/lib/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +15,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { CoffeeForm } from "@/components/coffee-form";
 import { CoffeePhotoGallery } from "@/components/coffee-photo-gallery";
-import { ArrowLeft, Edit, ExternalLink } from "lucide-react";
+import { ArrowLeft, Edit, ExternalLink, Clock, ChevronDown, Coffee as CoffeeIcon, Droplets } from "lucide-react";
 import { StarRating } from "@/components/star-rating";
 import { toast } from "sonner";
 import { mutate } from "swr";
@@ -29,7 +35,9 @@ export default function CoffeeDetailPage({
   const { id } = use(params);
   const { data: coffee, isLoading, mutate } = useCoffee(id);
   const { data: processMethods } = useProcessMethods();
+  const { data: timeline } = useCoffeeTimeline(id);
   const [showEdit, setShowEdit] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
 
   const processName =
     processMethods?.find((pm) => pm.id === coffee?.processMethodId)?.name ?? "";
@@ -74,7 +82,7 @@ export default function CoffeeDetailPage({
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pt-6">
+    <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
       <div className="mb-4 flex items-center gap-3">
         <Link href="/coffees">
           <Button variant="ghost" size="icon-sm">
@@ -110,6 +118,41 @@ export default function CoffeeDetailPage({
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
+          {/* Brew Stats Summary */}
+          {timeline?.stats?.totalBrews > 0 && (
+            <div className="flex items-center gap-4 p-3 bg-secondary/50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <CoffeeIcon className="size-4 text-muted-foreground" />
+                <div>
+                  <p className="text-lg font-bold text-foreground">{timeline.stats.totalBrews}</p>
+                  <p className="text-xs text-muted-foreground">brews</p>
+                </div>
+              </div>
+              {timeline.stats.lastBrewed && (
+                <div className="flex items-center gap-2 border-l border-border pl-4">
+                  <Clock className="size-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {formatDistanceToNow(new Date(timeline.stats.lastBrewed), { addSuffix: true })}
+                    </p>
+                    <p className="text-xs text-muted-foreground">last brewed</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Grind Size Stats */}
+          {timeline?.grindStats?.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {timeline.grindStats.map((gs: { brewMethod: string; avgGrind: number | null; count: number }) => (
+                <Badge key={gs.brewMethod} variant="outline" className="text-xs">
+                  {gs.brewMethod}: avg grind {gs.avgGrind ?? "N/A"} ({gs.count} brews)
+                </Badge>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
             <div>
               <span className="text-muted-foreground text-xs">Roaster</span>
@@ -171,6 +214,47 @@ export default function CoffeeDetailPage({
               <ExternalLink className="size-3.5" />
               View online
             </a>
+          )}
+
+          {/* Brew Timeline */}
+          {timeline?.brews?.length > 0 && (
+            <div className="border-t border-border pt-4 mt-2">
+              <Collapsible open={showTimeline} onOpenChange={setShowTimeline}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
+                    <span className="text-sm font-semibold text-foreground">Brew History</span>
+                    <ChevronDown className={`size-4 text-muted-foreground transition-transform ${showTimeline ? "rotate-180" : ""}`} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                    {timeline.brews.map((brew: { 
+                      id: string; 
+                      timestamp: string; 
+                      brewMethod: string; 
+                      grindSize: number | null; 
+                      vialCode: string;
+                      gramsPerDose: number;
+                    }) => (
+                      <div key={brew.id} className="flex items-center gap-3 p-2 bg-secondary/30 rounded-lg text-sm">
+                        <Droplets className="size-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground capitalize">{brew.brewMethod}</span>
+                            {brew.grindSize && (
+                              <Badge variant="outline" className="text-xs">grind {brew.grindSize}</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(brew.timestamp), "MMM d, yyyy 'at' h:mm a")} • {brew.vialCode} • {brew.gramsPerDose}g
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
           )}
 
           {/* Photo Gallery */}

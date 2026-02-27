@@ -26,6 +26,8 @@ export async function GET(
     notes: r.notes,
     link: r.link,
     processMethodId: r.process_method_id,
+    color: r.color,
+    archived: r.archived ?? false,
     createdAt: r.created_at,
   });
 }
@@ -50,7 +52,8 @@ export async function PUT(
       tasting_notes = ${body.tastingNotes || ""},
       notes = ${body.notes || ""},
       link = ${body.link || ""},
-      process_method_id = ${body.processMethodId || null}
+      process_method_id = ${body.processMethodId || null},
+      color = ${body.color || null}
     WHERE id = ${id}
     RETURNING *
   `;
@@ -68,6 +71,25 @@ export async function PUT(
     notes: r.notes,
     link: r.link,
     processMethodId: r.process_method_id,
+    color: r.color,
+    archived: r.archived ?? false,
     createdAt: r.created_at,
   });
+}
+
+// PATCH /api/coffees/:id — archive/unarchive
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await req.json();
+  const sql = getDb();
+  
+  if (body.archived !== undefined) {
+    await sql`UPDATE coffees SET archived = ${body.archived} WHERE id = ${id}`;
+    return NextResponse.json({ ok: true });
+  }
+  
+  return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 }

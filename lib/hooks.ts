@@ -59,3 +59,7 @@ export function useAllVials(status?: "FULL" | "EMPTY" | null) {
   const url = status ? `/api/vials/all?status=${status}` : "/api/vials/all";
   return useSWR(url, fetcher);
 }
+
+export function useCoffeeTimeline(coffeeId: string | null) {
+  return useSWR(coffeeId ? `/api/coffees/${coffeeId}/timeline` : null, fetcher);
+}

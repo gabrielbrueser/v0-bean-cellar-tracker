@@ -18,6 +18,8 @@ export async function GET() {
     notes: r.notes,
     link: r.link,
     processMethodId: r.process_method_id,
+    color: r.color,
+    archived: r.archived ?? false,
     createdAt: r.created_at,
   }));
   return NextResponse.json(coffees);
@@ -28,8 +30,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const sql = getDb();
   const rows = await sql`
-    INSERT INTO coffees (roaster, coffee_name, score, origin, producer, variety, altitude, tasting_notes, notes, link, process_method_id)
-    VALUES (${body.roaster || "Tanat"}, ${body.coffeeName}, ${body.score || 0}, ${body.origin}, ${body.producer || ""}, ${body.variety || ""}, ${body.altitude || ""}, ${body.tastingNotes || ""}, ${body.notes || ""}, ${body.link || ""}, ${body.processMethodId || null})
+    INSERT INTO coffees (roaster, coffee_name, score, origin, producer, variety, altitude, tasting_notes, notes, link, process_method_id, color)
+    VALUES (${body.roaster || "Tanat"}, ${body.coffeeName}, ${body.score || 0}, ${body.origin}, ${body.producer || ""}, ${body.variety || ""}, ${body.altitude || ""}, ${body.tastingNotes || ""}, ${body.notes || ""}, ${body.link || ""}, ${body.processMethodId || null}, ${body.color || null})
     RETURNING *
   `;
   const r = rows[0];
@@ -46,6 +48,8 @@ export async function POST(req: NextRequest) {
     notes: r.notes,
     link: r.link,
     processMethodId: r.process_method_id,
+    color: r.color,
+    archived: r.archived ?? false,
     createdAt: r.created_at,
   });
 }
