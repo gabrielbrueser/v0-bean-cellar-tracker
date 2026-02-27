@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import QRCode from "qrcode";
+import QRCode from "react-qr-code";
 
 interface QRCodeSVGProps {
   value: string;
@@ -10,53 +9,13 @@ interface QRCodeSVGProps {
 }
 
 export function QRCodeSVG({ value, size = 200, className }: QRCodeSVGProps) {
-  const [svgString, setSvgString] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!value) {
-      setError("No value provided");
-      return;
-    }
-
-    QRCode.toString(value, {
-      type: "svg",
-      errorCorrectionLevel: "H", // High error correction for reliability
-      margin: 4, // Quiet zone - critical for scanning
-      width: size,
-      color: {
-        dark: "#000000",
-        light: "#FFFFFF",
-      },
-    })
-      .then((svg) => {
-        setSvgString(svg);
-        setError(null);
-      })
-      .catch((err) => {
-        console.error("QR generation error:", err);
-        setError("Failed to generate QR code");
-      });
-  }, [value, size]);
-
-  if (error) {
+  if (!value) {
     return (
       <div
         className={`flex items-center justify-center bg-muted ${className}`}
         style={{ width: size, height: size }}
       >
-        <span className="text-xs text-muted-foreground">{error}</span>
-      </div>
-    );
-  }
-
-  if (!svgString) {
-    return (
-      <div
-        className={`flex items-center justify-center bg-white ${className}`}
-        style={{ width: size, height: size }}
-      >
-        <span className="text-xs text-muted-foreground">Loading...</span>
+        <span className="text-xs text-muted-foreground">No value</span>
       </div>
     );
   }
@@ -68,9 +27,17 @@ export function QRCodeSVG({ value, size = 200, className }: QRCodeSVGProps) {
         width: size,
         height: size,
         backgroundColor: "#FFFFFF",
+        padding: 8,
       }}
-      dangerouslySetInnerHTML={{ __html: svgString }}
-    />
+    >
+      <QRCode
+        value={value}
+        size={size - 16}
+        level="H"
+        bgColor="#FFFFFF"
+        fgColor="#000000"
+      />
+    </div>
   );
 }
 
