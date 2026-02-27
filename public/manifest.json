@@ -1,0 +1,9 @@
+{
+  "name": "Bean Cellar Tracker",
+  "short_name": "Bean Cellar",
+  "description": "Track your specialty coffee vials and inventory",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f3ed",
+  "theme_color": "#3d2514"
+}
