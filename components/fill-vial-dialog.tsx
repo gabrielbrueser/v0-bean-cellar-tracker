@@ -71,7 +71,7 @@ export function FillVialDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ coffeeId, doseTypeId, roastDate, gramsPerDose: grams }),
       });
-      toast.success("Vial filled!", { description: `${grams}g ready for brewing.` });
+      toast.success("Dose sealed!", { description: `${grams}g ready for brewing.` });
       mutate(`vial-${vialId}`);
       mutate(`fill-active-${vialId}`);
       mutate(`fill-sessions-${vialId}`);
@@ -82,7 +82,7 @@ export function FillVialDialog({
       setRoastDate("");
       setGrams("");
     } catch {
-      toast.error("Failed to fill vial");
+      toast.error("Failed to seal dose");
     } finally {
       setLoading(false);
     }
@@ -116,12 +116,12 @@ export function FillVialDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {hasActiveFill ? "Refill Vial" : "Fill Vial"}
+            {hasActiveFill ? "Reseal Dose" : "Seal Dose"}
           </DialogTitle>
           <DialogDescription>
             {hasActiveFill
               ? "The current coffee will be archived and replaced."
-              : "Choose a coffee and enter the roast date."}
+              : "Select a coffee and roast date to seal this dose."}
           </DialogDescription>
         </DialogHeader>
 
@@ -182,7 +182,7 @@ export function FillVialDialog({
             Cancel
           </Button>
           <Button onClick={handleFill} disabled={loading}>
-            {loading ? "Filling..." : "Fill Vial"}
+            {loading ? "Sealing..." : "Seal Dose"}
           </Button>
         </DialogFooter>
       </DialogContent>

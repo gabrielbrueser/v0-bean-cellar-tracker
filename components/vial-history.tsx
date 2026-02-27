@@ -35,7 +35,7 @@ function HistoryItem({ session }: { session: FillSession }) {
         }
         className="text-xs"
       >
-        {session.status}
+        {session.status === "FULL" ? "Sealed" : session.status === "USED" ? "Brewed" : session.status}
       </Badge>
     </div>
   );

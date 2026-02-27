@@ -22,8 +22,8 @@ export default function HomePage() {
         if (vial) {
           router.push(`/vials/${vial.id}`);
         } else {
-          toast.error("Vial not found", {
-            description: "This QR code doesn't match any known vial.",
+          toast.error("Dose not found", {
+            description: "This QR code doesn't match any known dose.",
           });
           setShowScanner(false);
         }

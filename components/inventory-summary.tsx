@@ -52,7 +52,7 @@ export function InventorySummary() {
               No inventory yet
             </p>
             <p className="text-xs text-muted-foreground">
-              Create vials and fill them with coffee to see your inventory here.
+              Create doses and seal them with coffee to see your inventory here.
             </p>
           </div>
         </CardContent>
@@ -84,7 +84,7 @@ export function InventorySummary() {
                     ? group.firstVialCode
                     : group.firstVialCode
                     ? `${group.firstVialCode} + ${group.count - 1} more`
-                    : `${group.count} vials`}
+                    : `${group.count} doses`}
                 </span>
               </div>
               <Badge

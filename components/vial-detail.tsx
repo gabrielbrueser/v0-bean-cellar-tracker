@@ -63,7 +63,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
         body: JSON.stringify({ brewType }),
       });
       if (!res.ok) throw new Error("Failed");
-      toast.success("Coffee used!", { description: `Brewed as ${brewType}. Vial marked as empty.` });
+      toast.success("Coffee brewed!", { description: `Brewed as ${brewType}. Dose marked as brewed.` });
       setShowUseDialog(false);
       mutate(`/api/vials/${vialId}`);
       mutate(`/api/vials/${vialId}/fill-sessions`);
@@ -90,7 +90,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
   if (!vial) {
     return (
       <div className="flex flex-col items-center gap-4 py-12">
-        <p className="text-sm text-muted-foreground">Vial not found</p>
+        <p className="text-sm text-muted-foreground">Dose not found</p>
         <Link href="/">
           <Button variant="outline" size="sm">
             <ArrowLeft className="size-4" />
@@ -128,7 +128,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
               : "text-muted-foreground"
           }
         >
-          {vial.status}
+          {vial.status === "FULL" ? "Sealed" : "Brewed"}
         </Badge>
         <Link href={`/vials/${vialId}/label`}>
           <Button variant="outline" size="icon-sm">
@@ -223,7 +223,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
             size="lg"
           >
             <Droplets className="size-5" />
-            Use this coffee for my brew
+            Brew my dose
           </Button>
         </>
       ) : (
@@ -231,7 +231,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
           <CardContent className="flex flex-col items-center gap-3 py-8">
             <Droplets className="size-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              This vial is empty. Fill it with a coffee to get started.
+              This dose has been brewed. Seal a new dose to continue.
             </p>
           </CardContent>
         </Card>
@@ -242,7 +242,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
         onClick={() => setShowFillDialog(true)}
         className="w-full"
       >
-        {isFull ? "Refill / Change Coffee" : "Fill Vial"}
+        {isFull ? "Reseal / Change Coffee" : "Seal Dose"}
       </Button>
 
       {fillSessions && fillSessions.length > 0 && (

@@ -84,13 +84,13 @@ export default function SettingsPage() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete");
-      toast.success(`Vial ${vialToDelete.vialCode} deleted`);
+      toast.success(`Dose ${vialToDelete.vialCode} deleted`);
       mutate("/api/vials/all");
       mutate("/api/inventory");
       mutate("vials");
       setVialToDelete(null);
     } catch {
-      toast.error("Failed to delete vial");
+      toast.error("Failed to delete dose");
     } finally {
       setIsDeleting(false);
     }
@@ -160,7 +160,7 @@ export default function SettingsPage() {
       setNewVialCode("");
       setRenameError(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to rename vial";
+      const message = err instanceof Error ? err.message : "Failed to rename dose";
       setRenameError(message);
     } finally {
       setIsRenaming(false);
@@ -172,7 +172,7 @@ export default function SettingsPage() {
       <div className="mb-6">
         <h1 className="text-xl font-bold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Manage vials and view activity history
+          Manage doses and view activity history
         </p>
       </div>
 
@@ -181,10 +181,10 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <TestTube className="size-4" />
-            Vial Management
+            Dose Management
           </CardTitle>
           <CardDescription>
-            View, rename, and delete your vials
+            View, rename, and delete your doses
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -194,7 +194,7 @@ export default function SettingsPage() {
             onClick={() => setShowVialManager(true)}
           >
             <Settings2 className="size-4 mr-2" />
-            Manage Vials ({vials?.length ?? 0})
+            Manage Doses ({vials?.length ?? 0})
           </Button>
         </CardContent>
       </Card>
@@ -221,7 +221,7 @@ export default function SettingsPage() {
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <Coffee className="size-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
-                No activity yet. Use a vial to see your history here.
+                No activity yet. Brew a dose to see your history here.
               </p>
             </div>
           ) : (
@@ -310,9 +310,9 @@ export default function SettingsPage() {
       <Dialog open={showVialManager} onOpenChange={setShowVialManager}>
         <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Manage Vials</DialogTitle>
+            <DialogTitle>Manage Doses</DialogTitle>
             <DialogDescription>
-              View, rename, or delete your vials. Renaming changes the display code only.
+              View, rename, or delete your doses. Renaming changes the display code only.
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto py-4">
@@ -326,7 +326,7 @@ export default function SettingsPage() {
               <div className="flex flex-col items-center gap-2 py-8 text-center">
                 <TestTube className="size-8 text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">
-                  No vials created yet.
+                  No doses created yet.
                 </p>
               </div>
             ) : (
@@ -345,7 +345,7 @@ export default function SettingsPage() {
                           variant={vial.status === "FULL" ? "default" : "secondary"}
                           className="text-xs"
                         >
-                          {vial.status}
+                          {vial.status === "FULL" ? "Sealed" : "Brewed"}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
@@ -393,9 +393,9 @@ export default function SettingsPage() {
       <Dialog open={!!vialToRename} onOpenChange={() => { setVialToRename(null); setRenameError(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Rename Vial</DialogTitle>
+            <DialogTitle>Rename Dose</DialogTitle>
             <DialogDescription>
-              Change the display code for this vial. The QR code will still work.
+              Change the display code for this dose. The QR code will still work.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
@@ -406,7 +406,7 @@ export default function SettingsPage() {
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="newCode">New Vial Code</Label>
+              <Label htmlFor="newCode">New Dose Code</Label>
               <Input
                 id="newCode"
                 value={newVialCode}
@@ -440,11 +440,11 @@ export default function SettingsPage() {
       <AlertDialog open={!!vialToDelete} onOpenChange={() => setVialToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Vial?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Dose?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete vial{" "}
+              Are you sure you want to delete dose{" "}
               <span className="font-mono font-medium">{vialToDelete?.vialCode}</span>?
-              This will permanently remove the vial and all its fill history.
+              This will permanently remove the dose and all its seal history.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

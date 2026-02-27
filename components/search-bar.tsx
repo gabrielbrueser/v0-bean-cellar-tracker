@@ -39,9 +39,9 @@ export function SearchBar() {
       for (const v of vials) {
         if (v.vialCode.toLowerCase().includes(q)) {
           items.push({
-            type: "vial",
+            type: "dose",
             label: v.vialCode,
-            sub: v.status,
+            sub: v.status === "FULL" ? "Sealed" : "Brewed",
             href: `/vials/${v.id}`,
           });
         }
@@ -57,7 +57,7 @@ export function SearchBar() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Search coffees, vials, origins..."
+          placeholder="Search coffees, doses, origins..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="pl-9"

@@ -46,7 +46,7 @@ export default function InventoryPage() {
           Inventory
         </h1>
         <p className="text-sm text-muted-foreground">
-          All your vials in one place
+          All your doses in one place
         </p>
       </header>
 
@@ -68,7 +68,7 @@ export default function InventoryPage() {
             className="h-7 text-xs"
             onClick={() => setFilter("FULL")}
           >
-            Full ({fullCount})
+            Sealed ({fullCount})
           </Button>
           <Button
             variant={filter === "EMPTY" ? "default" : "ghost"}
@@ -76,7 +76,7 @@ export default function InventoryPage() {
             className="h-7 text-xs"
             onClick={() => setFilter("EMPTY")}
           >
-            Empty ({emptyCount})
+            Brewed ({emptyCount})
           </Button>
         </div>
       </div>
@@ -93,16 +93,16 @@ export default function InventoryPage() {
             <Package className="size-10 text-muted-foreground/50" />
             <div className="text-center">
               <p className="text-sm font-medium text-foreground">
-                No vials found
+                No doses found
               </p>
               <p className="text-xs text-muted-foreground">
                 {filter
-                  ? `No ${filter.toLowerCase()} vials. Try changing the filter.`
-                  : "Create vials to see them here."}
+                  ? `No ${filter === "FULL" ? "sealed" : "brewed"} doses. Try changing the filter.`
+                  : "Create doses to see them here."}
               </p>
             </div>
             <Link href="/vials/create">
-              <Button size="sm">Create a Vial</Button>
+              <Button size="sm">Create a Dose</Button>
             </Link>
           </CardContent>
         </Card>
@@ -126,13 +126,13 @@ export default function InventoryPage() {
                       <span className="font-bold text-foreground truncate">
                         {vial.status === "FULL" && vial.coffeeName
                           ? vial.coffeeName
-                          : "Empty Vial"}
+                          : "Brewed Dose"}
                       </span>
                       <Badge
                         variant={vial.status === "FULL" ? "default" : "secondary"}
                         className="text-xs shrink-0"
                       >
-                        {vial.status}
+                        {vial.status === "FULL" ? "Sealed" : "Brewed"}
                       </Badge>
                     </div>
                     {/* Secondary: Roaster + dose info */}

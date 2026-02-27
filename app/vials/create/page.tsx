@@ -33,7 +33,7 @@ export default function CreateVialPage() {
       const vial = await res.json();
       setCreatedVialId(vial.id);
       setCreatedVialCode(vial.vialCode);
-      toast.success(`Vial ${vial.vialCode} created!`);
+      toast.success(`Dose ${vial.vialCode} created!`);
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Failed to create vial");
@@ -47,7 +47,7 @@ export default function CreateVialPage() {
       <div className="mx-auto max-w-lg px-4 pt-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-center">Vial Created</CardTitle>
+            <CardTitle className="text-center">Dose Created</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
             <div className="flex size-20 items-center justify-center rounded-full bg-primary/10">
@@ -57,7 +57,7 @@ export default function CreateVialPage() {
               {createdVialCode}
             </p>
             <p className="text-sm text-center text-muted-foreground">
-              This vial has a permanent QR code. Print the label and stick it on your vial.
+              This dose has a permanent QR code. Print the label and attach it to your container.
             </p>
             <div className="flex w-full flex-col gap-2">
               <Link href={`/vials/${createdVialId}/label`} className="w-full">
@@ -68,7 +68,7 @@ export default function CreateVialPage() {
               </Link>
               <Link href={`/vials/${createdVialId}`} className="w-full">
                 <Button variant="outline" className="w-full" size="lg">
-                  View Vial Details
+                  View Dose Details
                 </Button>
               </Link>
               <Button
@@ -98,9 +98,9 @@ export default function CreateVialPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Create New Vial</h1>
+          <h1 className="text-xl font-bold text-foreground">Create New Dose</h1>
           <p className="text-sm text-muted-foreground">
-            Choose a dose type to create a new vial with a permanent QR code
+            Choose a dose type to create a new dose with a permanent QR code
           </p>
         </div>
       </div>

@@ -29,7 +29,7 @@ export function VialLabel({ vialId }: VialLabelProps) {
   if (!vial) {
     return (
       <div className="flex flex-col items-center gap-4 py-12">
-        <p className="text-sm text-muted-foreground">Vial not found</p>
+        <p className="text-sm text-muted-foreground">Dose not found</p>
       </div>
     );
   }
@@ -103,7 +103,7 @@ export function VialLabel({ vialId }: VialLabelProps) {
 
         <p className="text-xs text-center text-muted-foreground">
           For best results, use a label printer with 2x1 inch stickers.
-          The QR code links directly to this vial.
+          The QR code links directly to this dose.
         </p>
       </div>
 

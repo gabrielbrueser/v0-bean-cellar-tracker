@@ -164,9 +164,9 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
     return (
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
         <div className="text-center">
-          <p className="text-sm font-medium mb-1">Enter Vial Code Manually</p>
+          <p className="text-sm font-medium mb-1">Enter Dose Code Manually</p>
           <p className="text-xs text-muted-foreground">
-            Type the code shown on your vial label (e.g., ESP-001)
+            Type the code shown on your dose label (e.g., ESP-001)
           </p>
         </div>
         <div className="flex gap-2">
@@ -304,7 +304,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         )}
       </div>
       <p className="bg-card/80 backdrop-blur-sm py-2 text-center text-sm text-muted-foreground">
-        Point camera at a vial QR code
+        Point camera at a dose QR code
       </p>
     </div>
   );
