@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import { Toaster } from "sonner";
 import { BottomNav } from "@/components/bottom-nav";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -37,9 +37,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
       <body className="font-sans antialiased">
-        <main className="min-h-screen pb-20">{children}</main>
-        <BottomNav />
-        <Toaster position="top-center" richColors />
+        <Providers>
+          <main className="min-h-screen pb-20">{children}</main>
+          <BottomNav />
+        </Providers>
         <Analytics />
       </body>
     </html>

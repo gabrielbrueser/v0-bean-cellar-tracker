@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { useActivity, useAllVials, useDoseTypes } from "@/lib/hooks";
 import { mutate } from "swr";
 import { toast } from "sonner";
@@ -34,7 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Coffee, Clock, Beaker, Trash2, TestTube, Settings2, Pencil, AlertTriangle, Printer } from "lucide-react";
+import { Coffee, Clock, Beaker, Trash2, TestTube, Settings2, Pencil, AlertTriangle, Printer, LogOut, User } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
@@ -64,6 +65,7 @@ interface VialWithDetails {
 }
 
 export default function SettingsPage() {
+  const { data: session } = useSession();
   const { data: activities, isLoading: activitiesLoading } = useActivity();
   const { data: vials, isLoading: vialsLoading } = useAllVials();
   const { data: doseTypes } = useDoseTypes();
@@ -176,6 +178,34 @@ export default function SettingsPage() {
           Manage doses and view activity history
         </p>
       </div>
+
+      {/* User Account Card */}
+      {session?.user && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <User className="size-4" />
+              Account
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-sm">{session.user.name || session.user.email?.split("@")[0]}</p>
+                <p className="text-xs text-muted-foreground">{session.user.email}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
+                <LogOut className="size-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Vial Management Card */}
       <Card>
