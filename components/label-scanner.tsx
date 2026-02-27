@@ -57,19 +57,57 @@ export function LabelScanner({
 
   const startCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: 1280, height: 720 },
-      });
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API not available");
+      }
+
+      // iOS-friendly camera constraints
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+      } catch {
+        // Fallback to basic constraints
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+
       streamRef.current = stream;
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        // Wait for video to be ready - important for iOS
+        await new Promise<void>((resolve, reject) => {
+          const video = videoRef.current!;
+          video.onloadedmetadata = () => {
+            video.play().then(resolve).catch(reject);
+          };
+          video.onerror = () => reject(new Error("Video failed to load"));
+          setTimeout(() => reject(new Error("Camera timeout")), 10000);
+        });
       }
+      
       setMode("camera");
     } catch (err) {
-      console.error("Camera error:", err);
-      toast.error("Could not access camera", {
-        description: "Please check permissions or try uploading a photo.",
-      });
+      const message = err instanceof Error ? err.message : "Unknown error";
+      if (message.includes("Permission") || message.includes("NotAllowed")) {
+        toast.error("Camera access denied", {
+          description: "Please allow camera permissions in your browser settings.",
+        });
+      } else {
+        toast.error("Could not access camera", {
+          description: "Please try uploading a photo instead.",
+        });
+      }
     }
   }, []);
 
@@ -226,6 +264,8 @@ export function LabelScanner({
                 ref={videoRef}
                 autoPlay
                 playsInline
+                webkit-playsinline="true"
+                muted
                 className="w-full aspect-[4/3] bg-muted rounded-lg object-cover"
               />
               <canvas ref={canvasRef} className="hidden" />
