@@ -44,12 +44,14 @@ interface Activity {
   timestamp: string;
   brewMethod: string;
   notes: string;
+  grindSize: number | null;
   gramsPerDose: number;
   roastDate: string;
   vialCode: string;
   coffeeName: string;
   roaster: string;
   doseTypeName: string;
+  userName: string | null;
 }
 
 interface VialWithDetails {
@@ -282,6 +284,7 @@ export default function SettingsPage() {
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {activity.roaster} &middot; {activity.vialCode}
+                      {activity.userName && ` &middot; by ${activity.userName}`}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs text-muted-foreground">
