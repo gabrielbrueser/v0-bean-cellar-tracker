@@ -12,3 +12,34 @@ export async function GET() {
   }));
   return NextResponse.json(doseTypes);
 }
+
+export async function PUT(request: Request) {
+  const sql = getDb();
+  const { id, gramsPerDose } = await request.json();
+
+  if (!id || typeof gramsPerDose !== "number" || gramsPerDose <= 0) {
+    return NextResponse.json(
+      { error: "Invalid id or gramsPerDose" },
+      { status: 400 }
+    );
+  }
+
+  const rows = await sql`
+    UPDATE dose_types 
+    SET grams_per_dose = ${gramsPerDose} 
+    WHERE id = ${id}
+    RETURNING *
+  `;
+
+  if (rows.length === 0) {
+    return NextResponse.json({ error: "Dose type not found" }, { status: 404 });
+  }
+
+  const dt = rows[0];
+  return NextResponse.json({
+    id: dt.id,
+    name: dt.name,
+    gramsPerDose: dt.grams_per_dose,
+    prefix: dt.prefix,
+  });
+}

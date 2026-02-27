@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Package, Coffee, Plus } from "lucide-react";
+import { Home, Package, Coffee, Plus, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/inventory", label: "Inventory", icon: Package },
   { href: "/coffees", label: "Coffees", icon: Coffee },
-  { href: "/vials/create", label: "New Vial", icon: Plus },
+  { href: "/vials/create", label: "New", icon: Plus },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function BottomNav() {
