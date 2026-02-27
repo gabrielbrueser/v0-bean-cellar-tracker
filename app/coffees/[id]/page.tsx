@@ -15,6 +15,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { CoffeeForm } from "@/components/coffee-form";
+import { CoffeePhotoGallery } from "@/components/coffee-photo-gallery";
 import { ArrowLeft, Edit, ExternalLink } from "lucide-react";
 import { StarRating } from "@/components/star-rating";
 import { toast } from "sonner";
@@ -171,6 +172,11 @@ export default function CoffeeDetailPage({
               View online
             </a>
           )}
+
+          {/* Photo Gallery */}
+          <div className="border-t border-border pt-4 mt-2">
+            <CoffeePhotoGallery coffeeId={id} />
+          </div>
         </CardContent>
       </Card>
 
