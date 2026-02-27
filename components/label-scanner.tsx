@@ -42,6 +42,7 @@ export function LabelScanner({
   const [extractedData, setExtractedData] =
     useState<ExtractedCoffeeData | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -53,6 +54,7 @@ export function LabelScanner({
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+    setCameraReady(false);
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -62,46 +64,88 @@ export function LabelScanner({
         throw new Error("Camera API not available");
       }
 
-      // iOS-friendly camera constraints
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
+      // Request camera with multiple fallback constraints for iOS
+      let stream: MediaStream | null = null;
+      const constraints = [
+        { 
+          video: { 
+            facingMode: "environment",
             width: { ideal: 1280 },
             height: { ideal: 720 },
-          },
-          audio: false,
-        });
-      } catch {
-        // Fallback to basic constraints
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
+          }, 
+          audio: false 
+        },
+        { 
+          video: { 
+            facingMode: { ideal: "environment" },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          }, 
+          audio: false 
+        },
+        { video: true, audio: false },
+      ];
+
+      for (const constraint of constraints) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraint);
+          if (stream) break;
+        } catch {
+          continue;
+        }
+      }
+
+      if (!stream) {
+        throw new Error("Could not access camera");
       }
 
       streamRef.current = stream;
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        // Wait for video to be ready - important for iOS
-        await new Promise<void>((resolve, reject) => {
-          const video = videoRef.current!;
-          video.onloadedmetadata = () => {
-            video.play().then(resolve).catch(reject);
-          };
-          video.onerror = () => reject(new Error("Video failed to load"));
-          setTimeout(() => reject(new Error("Camera timeout")), 10000);
-        });
-      }
-      
       setMode("camera");
+
+      // Wait a tick for the video element to be in the DOM
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      
+      const video = videoRef.current;
+      if (!video) {
+        throw new Error("Video element not found");
+      }
+
+      // iOS-specific setup
+      video.setAttribute("autoplay", "");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("muted", "");
+      video.muted = true;
+      video.srcObject = stream;
+
+      // Wait for video to be ready
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error("Camera timeout"));
+        }, 15000);
+
+        video.onloadedmetadata = () => {
+          clearTimeout(timeoutId);
+          video.play()
+            .then(() => {
+              setCameraReady(true);
+              resolve();
+            })
+            .catch((e) => reject(e));
+        };
+
+        video.onerror = () => {
+          clearTimeout(timeoutId);
+          reject(new Error("Video failed to load"));
+        };
+      });
     } catch (err) {
+      stopCamera();
+      setMode("select");
+      
       const message = err instanceof Error ? err.message : "Unknown error";
-      if (message.includes("Permission") || message.includes("NotAllowed")) {
+      if (message.includes("Permission") || message.includes("NotAllowed") || message.includes("denied")) {
         toast.error("Camera access denied", {
-          description: "Please allow camera permissions in your browser settings.",
+          description: "Please allow camera permissions in Settings > Safari > Camera.",
         });
       } else {
         toast.error("Could not access camera", {
@@ -109,20 +153,22 @@ export function LabelScanner({
         });
       }
     }
-  }, []);
+  }, [stopCamera]);
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    
+    // Use actual video dimensions
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = canvas.toDataURL("image/jpeg", 0.9);
     setCapturedImage(imageData);
     stopCamera();
@@ -141,6 +187,9 @@ export function LabelScanner({
         setMode("preview");
       };
       reader.readAsDataURL(file);
+      
+      // Reset input so same file can be selected again
+      event.target.value = "";
     },
     []
   );
@@ -191,6 +240,7 @@ export function LabelScanner({
     stopCamera();
     setCapturedImage(null);
     setExtractedData(null);
+    setCameraReady(false);
     setMode("select");
     onOpenChange(false);
   }, [stopCamera, onOpenChange]);
@@ -251,6 +301,7 @@ export function LabelScanner({
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                capture="environment"
                 className="hidden"
                 onChange={handleFileUpload}
               />
@@ -260,14 +311,27 @@ export function LabelScanner({
           {/* Camera Mode */}
           {mode === "camera" && (
             <div className="relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                webkit-playsinline="true"
-                muted
-                className="w-full aspect-[4/3] bg-muted rounded-lg object-cover"
-              />
+              <div className="w-full aspect-[4/3] bg-muted rounded-lg overflow-hidden relative">
+                {!cameraReady && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="size-8 animate-spin text-primary" />
+                      <p className="text-sm text-muted-foreground">Starting camera...</p>
+                    </div>
+                  </div>
+                )}
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                  style={{ 
+                    opacity: cameraReady ? 1 : 0,
+                    transform: "scaleX(1)" 
+                  }}
+                />
+              </div>
               <canvas ref={canvasRef} className="hidden" />
               <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-3">
                 <Button
@@ -284,6 +348,7 @@ export function LabelScanner({
                   size="lg"
                   className="rounded-full size-14"
                   onClick={capturePhoto}
+                  disabled={!cameraReady}
                 >
                   <Camera className="size-6" />
                 </Button>
