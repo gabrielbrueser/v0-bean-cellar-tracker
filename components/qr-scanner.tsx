@@ -46,20 +46,29 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
       // Request camera with fallback constraints for iOS compatibility
       let stream: MediaStream;
       const constraints = [
-        // Try environment-facing camera first (back camera)
+        // Try environment-facing camera first with high resolution for better QR detection
         { 
           video: { 
-            facingMode: "environment",
-            width: { ideal: 640 },
-            height: { ideal: 480 },
+            facingMode: { exact: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           }, 
           audio: false 
         },
-        // Fallback: any camera with lower resolution
+        // Try environment without exact constraint
         { 
           video: { 
-            width: { ideal: 320 },
-            height: { ideal: 240 },
+            facingMode: "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          }, 
+          audio: false 
+        },
+        // Fallback: any camera
+        { 
+          video: { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
           }, 
           audio: false 
         },
@@ -126,38 +135,24 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
       }
 
       // Start scanning loop using jsQR (works on all browsers)
-      let frameCount = 0;
-      let lastLogTime = Date.now();
-      
       const scan = () => {
         if (!scanningRef.current || !video || !canvas || !ctx) return;
 
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-          // Use a reasonable canvas size for faster processing
-          const maxDimension = 640;
-          const scale = Math.min(maxDimension / video.videoWidth, maxDimension / video.videoHeight, 1);
-          canvas.width = Math.floor(video.videoWidth * scale);
-          canvas.height = Math.floor(video.videoHeight * scale);
+        if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+          // Use full resolution for better QR detection
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
           
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           
-          // Try multiple inversion attempts for better detection
+          // Try with attemptBoth for screens that might have inverted colors
           const code = jsQR(imageData.data, imageData.width, imageData.height, {
             inversionAttempts: "attemptBoth",
           });
 
-          frameCount++;
-          
-          // Log every 2 seconds for debugging
-          if (Date.now() - lastLogTime > 2000) {
-            console.log("[v0] QR Scanner: frames processed:", frameCount, "canvas size:", canvas.width, "x", canvas.height);
-            lastLogTime = Date.now();
-          }
-
           if (code && code.data) {
-            console.log("[v0] QR Code detected:", code.data);
             stopStream();
             onScan(code.data);
             return;
