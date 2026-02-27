@@ -15,7 +15,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { CoffeeForm } from "@/components/coffee-form";
-import { ArrowLeft, Edit, Star, ExternalLink } from "lucide-react";
+import { ArrowLeft, Edit, ExternalLink } from "lucide-react";
+import { StarRating } from "@/components/star-rating";
+import { toast } from "sonner";
+import { mutate } from "swr";
 
 export default function CoffeeDetailPage({
   params,
@@ -29,6 +32,22 @@ export default function CoffeeDetailPage({
 
   const processName =
     processMethods?.find((pm) => pm.id === coffee?.processMethodId)?.name ?? "";
+
+  const handleRatingChange = async (newRating: number) => {
+    if (!coffee) return;
+    try {
+      await fetch(`/api/coffees/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...coffee, score: newRating }),
+      });
+      mutate(`/api/coffees/${id}`);
+      mutate("coffees");
+      toast.success(`Rated ${newRating} stars`);
+    } catch {
+      toast.error("Failed to update rating");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -79,12 +98,14 @@ export default function CoffeeDetailPage({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>{coffee.coffeeName}</CardTitle>
-            {coffee.score > 0 && (
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Star className="size-3 fill-current" />
-                {coffee.score}
-              </Badge>
-            )}
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs text-muted-foreground">Your rating:</span>
+            <StarRating
+              value={coffee.score || 0}
+              onChange={handleRatingChange}
+              size="md"
+            />
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">

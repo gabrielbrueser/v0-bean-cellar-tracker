@@ -15,7 +15,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { CoffeeForm } from "@/components/coffee-form";
-import { Coffee, Plus, Star } from "lucide-react";
+import { StarRating } from "@/components/star-rating";
+import { Coffee, Plus } from "lucide-react";
 
 export default function CoffeesPage() {
   const { data: coffees, isLoading, mutate } = useCoffees();
@@ -89,15 +90,9 @@ export default function CoffeesPage() {
                       </p>
                     )}
                   </div>
-                  {c.score > 0 && (
-                    <Badge
-                      variant="outline"
-                      className="flex items-center gap-1 text-xs shrink-0"
-                    >
-                      <Star className="size-3 fill-current" />
-                      {c.score}
-                    </Badge>
-                  )}
+                  <div className="shrink-0">
+                    <StarRating value={c.score || 0} readonly size="sm" />
+                  </div>
                 </CardContent>
               </Card>
             </Link>

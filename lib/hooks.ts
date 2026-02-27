@@ -50,3 +50,12 @@ export function useFillSessions(vialId: string | null) {
 export function useCoffee(id: string | null) {
   return useSWR(id ? `/api/coffees/${id}` : null, fetcher);
 }
+
+export function useActivity() {
+  return useSWR("/api/activity", fetcher);
+}
+
+export function useAllVials(status?: "FULL" | "EMPTY" | null) {
+  const url = status ? `/api/vials/all?status=${status}` : "/api/vials/all";
+  return useSWR(url, fetcher);
+}
