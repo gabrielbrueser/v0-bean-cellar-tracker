@@ -58,7 +58,7 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
     handleChange("processMethodId", value);
   };
 
-  const handleScanData = (data: {
+  const handleScanData = async (data: {
     coffeeName: string | null;
     roaster: string | null;
     origin: string | null;
@@ -89,9 +89,24 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
       if (matchedProcess) {
         handleChange("processMethodId", matchedProcess.id);
       } else {
-        // Set custom process for user to add
-        setCustomProcess(data.processMethod);
-        setShowCustomProcess(true);
+        // Auto-create the new process method
+        try {
+          const res = await fetch("/api/process-methods", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: data.processMethod.trim() }),
+          });
+          if (res.ok) {
+            const pm = await res.json();
+            handleChange("processMethodId", pm.id);
+            mutatePM();
+            toast.success(`Process "${data.processMethod}" added`);
+          }
+        } catch {
+          // Fallback: show custom process input
+          setCustomProcess(data.processMethod);
+          setShowCustomProcess(true);
+        }
       }
     }
 
