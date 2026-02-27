@@ -4,56 +4,56 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { QRScanner } from "@/components/qr-scanner";
 import { useHomeData } from "@/lib/hooks";
+import { QRScanner } from "@/components/qr-scanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QrCode, Plus, Coffee, ChevronRight, Sparkles, Clock } from "lucide-react";
+import { QrCode, Plus, Coffee, ChevronRight, Sparkles, Leaf } from "lucide-react";
 
-function getGreeting(): string {
+function getGreeting() {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
 
-function getRelativeTime(timestamp: string): string {
+function getRelativeTime(timestamp: string) {
   const now = new Date();
-  const then = new Date(timestamp);
-  const diffMs = now.getTime() - then.getTime();
+  const date = new Date(timestamp);
+  const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMins < 60) return "just now";
-  if (diffHours < 24) return diffHours === 1 ? "1 hour ago" : `${diffHours} hours ago`;
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays === 1) return "yesterday";
   if (diffDays < 7) return `${diffDays} days ago`;
-  return then.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return date.toLocaleDateString();
 }
 
-function getFreshnessLabel(days: number): { label: string; variant: "default" | "secondary" | "outline" | "destructive" } {
-  if (days < 7) return { label: "Resting", variant: "secondary" };
-  if (days <= 21) return { label: "Peak", variant: "default" };
-  if (days <= 35) return { label: "Fading", variant: "outline" };
-  return { label: "Stale", variant: "destructive" };
+function getFreshnessLabel(days: number) {
+  if (days < 7) return { label: "Resting", color: "bg-amber-500/15 text-amber-700" };
+  if (days <= 21) return { label: "Peak", color: "bg-green-500/15 text-green-700" };
+  if (days <= 35) return { label: "Fading", color: "bg-orange-500/15 text-orange-700" };
+  return { label: "Stale", color: "bg-red-500/15 text-red-700" };
 }
 
-function getColorClass(color: string | null): string {
-  if (!color) return "";
+function getColorClass(color: string | null) {
   const colors: Record<string, string> = {
-    amber: "border-l-amber-500",
-    orange: "border-l-orange-500",
-    red: "border-l-red-500",
-    pink: "border-l-pink-500",
-    purple: "border-l-purple-500",
-    blue: "border-l-blue-500",
-    teal: "border-l-teal-500",
-    green: "border-l-green-500",
+    amber: "bg-amber-500",
+    orange: "bg-orange-500",
+    red: "bg-red-500",
+    pink: "bg-pink-500",
+    purple: "bg-purple-500",
+    blue: "bg-blue-500",
+    teal: "bg-teal-500",
+    green: "bg-green-500",
   };
-  return colors[color] || "";
+  return color ? colors[color] : null;
 }
 
 export default function HomePage() {
@@ -64,7 +64,9 @@ export default function HomePage() {
   const handleScan = useCallback(
     async (value: string) => {
       try {
-        const res = await fetch(`/api/vials/lookup?qr=${encodeURIComponent(value)}`);
+        const res = await fetch(
+          `/api/vials/lookup?qr=${encodeURIComponent(value)}`
+        );
         const vial = await res.json();
         if (vial) {
           router.push(`/vials/${vial.id}`);
@@ -92,9 +94,9 @@ export default function HomePage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
-      {/* Greeting Header */}
+      {/* Greeting */}
       <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           {getGreeting()}
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -102,71 +104,71 @@ export default function HomePage() {
         </p>
       </header>
 
-      {/* A) Last Brew Context */}
+      {/* Last Brew Context */}
       {!isLoading && data?.lastBrew && (
         <section className="mb-6" aria-label="Last brew">
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-            <div className="p-2 rounded-full bg-muted">
-              <Clock className="size-4 text-muted-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-muted-foreground mb-0.5">Last brew</p>
-              <p className="text-sm font-medium text-foreground truncate">
-                {data.lastBrew.coffeeName}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {data.lastBrew.brewMethod} &middot; {getRelativeTime(data.lastBrew.timestamp)}
-              </p>
-              {data.lastBrew.notes && (
-                <p className="text-xs text-muted-foreground/80 mt-1 italic truncate">
-                  "{data.lastBrew.notes}"
+          <div className="flex items-center gap-2 mb-2">
+            <Coffee className="size-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Last brew
+            </span>
+          </div>
+          <div className="bg-muted/50 rounded-lg px-3 py-2.5">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="font-medium text-sm text-foreground truncate">
+                  {data.lastBrew.coffeeName}
                 </p>
-              )}
+                <p className="text-xs text-muted-foreground">
+                  {data.lastBrew.brewMethod} · {getRelativeTime(data.lastBrew.timestamp)}
+                </p>
+              </div>
             </div>
+            {data.lastBrew.notes && (
+              <p className="mt-1.5 text-xs text-muted-foreground italic truncate">
+                "{data.lastBrew.notes}"
+              </p>
+            )}
           </div>
         </section>
       )}
 
-      {/* B) Primary Brew Card */}
+      {/* Primary Brew Card */}
       <section className="mb-6" aria-label="Suggested brew">
         {isLoading ? (
           <Card className="overflow-hidden">
-            <CardContent className="p-6">
-              <Skeleton className="h-4 w-24 mb-2" />
-              <Skeleton className="h-6 w-48 mb-1" />
+            <CardContent className="p-5">
+              <Skeleton className="h-4 w-20 mb-3" />
+              <Skeleton className="h-6 w-48 mb-2" />
               <Skeleton className="h-4 w-32 mb-4" />
               <Skeleton className="h-12 w-full" />
             </CardContent>
           </Card>
         ) : data?.suggested ? (
-          <Card className={`overflow-hidden border-l-4 ${getColorClass(data.suggested.color) || "border-l-primary"}`}>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Your next brew</p>
-                  <h2 className="text-xl font-bold text-foreground leading-tight">
-                    {data.suggested.coffeeName}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {data.suggested.roaster}
-                  </p>
-                </div>
-                <Badge variant={getFreshnessLabel(data.suggested.daysSinceRoast).variant}>
+          <Card className="overflow-hidden border-2 shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                {getColorClass(data.suggested.color) && (
+                  <span className={`size-2.5 rounded-full ${getColorClass(data.suggested.color)}`} />
+                )}
+                <Badge 
+                  variant="secondary" 
+                  className={`text-xs font-medium ${getFreshnessLabel(data.suggested.daysSinceRoast).color}`}
+                >
                   {getFreshnessLabel(data.suggested.daysSinceRoast).label}
                 </Badge>
               </div>
               
-              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-5">
-                <span className="font-mono">{data.suggested.gramsPerDose}g</span>
-                <span>&middot;</span>
-                <span>{data.suggested.doseTypeName}</span>
-                <span>&middot;</span>
-                <span className="font-mono text-xs">{data.suggested.vialCode}</span>
-              </div>
+              <h2 className="text-xl font-bold text-foreground mb-1">
+                {data.suggested.coffeeName}
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                {data.suggested.roaster} · {data.suggested.gramsPerDose}g {data.suggested.doseTypeName}
+              </p>
 
               <Link href={`/vials/${data.suggested.vialId}`}>
-                <Button size="lg" className="w-full text-base font-semibold h-12">
-                  <Coffee className="size-5 mr-2" />
+                <Button className="w-full h-12 text-base font-semibold gap-2">
+                  <Sparkles className="size-4" />
                   Brew my dose
                 </Button>
               </Link>
@@ -175,19 +177,18 @@ export default function HomePage() {
         ) : (
           <Card className="overflow-hidden border-dashed">
             <CardContent className="p-6 text-center">
-              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
-                <Coffee className="size-6 text-muted-foreground" />
+              <div className="size-12 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+                <Leaf className="size-5 text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium text-foreground mb-1">
+              <p className="font-medium text-foreground mb-1">
                 No sealed doses
               </p>
-              <p className="text-xs text-muted-foreground mb-4">
-                Seal a dose to get started
+              <p className="text-sm text-muted-foreground mb-4">
+                Seal one to get started
               </p>
-              <Link href="/vials/create">
+              <Link href="/batch-seal">
                 <Button variant="outline" size="sm">
-                  <Plus className="size-4 mr-1.5" />
-                  Create dose
+                  Seal a dose
                 </Button>
               </Link>
             </CardContent>
@@ -195,78 +196,72 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* C) Secondary Actions */}
+      {/* Secondary Actions */}
       <section className="mb-6" aria-label="Quick actions">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex gap-3">
           <Button
             variant="outline"
-            className="h-12 justify-start px-4"
+            className="flex-1 h-11 gap-2"
             onClick={() => setShowScanner(true)}
           >
-            <QrCode className="size-4 mr-2 text-muted-foreground" />
-            <span className="text-sm">Scan dose</span>
+            <QrCode className="size-4" />
+            Scan dose
           </Button>
-          <Link href="/batch-seal" className="contents">
-            <Button variant="outline" className="h-12 justify-start px-4">
-              <Plus className="size-4 mr-2 text-muted-foreground" />
-              <span className="text-sm">Seal doses</span>
+          <Link href="/vials/create" className="flex-1">
+            <Button variant="outline" className="w-full h-11 gap-2">
+              <Plus className="size-4" />
+              New dose
             </Button>
           </Link>
         </div>
       </section>
 
-      {/* E) Go-To Coffee */}
-      {!isLoading && data?.goTo && (
-        <section className="mb-6" aria-label="Go-to coffee">
-          <Link href={`/coffees/${data.goTo.coffeeId}`}>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-              <div className="p-2 rounded-full bg-primary/10">
-                <Sparkles className="size-4 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Your go-to lately</p>
-                <p className="text-sm font-medium text-foreground truncate">
-                  {data.goTo.coffeeName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Brewed {data.goTo.brewCount} times this month
-                </p>
-              </div>
-              <ChevronRight className="size-4 text-muted-foreground" />
-            </div>
-          </Link>
-        </section>
-      )}
-
-      {/* D) Inventory Snapshot */}
+      {/* Inventory Snapshot */}
       {!isLoading && data?.inventory && data.inventory.length > 0 && (
-        <section className="mb-6" aria-label="Inventory snapshot">
+        <section className="mb-6" aria-label="Inventory">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-foreground">
-              In your cellar
-            </h2>
-            <Link href="/inventory" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <h3 className="text-sm font-medium text-foreground">
+              On hand
+            </h3>
+            <Link 
+              href="/inventory" 
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+            >
               View all
+              <ChevronRight className="size-3" />
             </Link>
           </div>
           <div className="space-y-2">
-            {data.inventory.map((item: { coffeeId: string; coffeeName: string; roaster: string; color: string | null; doseTypeName: string; count: number }) => (
-              <Link key={`${item.coffeeId}-${item.doseTypeName}`} href={`/coffees/${item.coffeeId}`}>
-                <div className={`flex items-center justify-between p-3 rounded-lg bg-card border hover:bg-muted/50 transition-colors ${item.color ? `border-l-4 ${getColorClass(item.color)}` : ""}`}>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {item.coffeeName}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.doseTypeName}
-                    </p>
+            {data.inventory.map((item: {
+              coffeeId: string;
+              coffeeName: string;
+              roaster: string;
+              color: string | null;
+              doseTypeName: string;
+              count: number;
+            }) => (
+              <Link 
+                key={`${item.coffeeId}-${item.doseTypeName}`}
+                href={`/coffees/${item.coffeeId}`}
+                className="block"
+              >
+                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {getColorClass(item.color) && (
+                      <span className={`size-2 rounded-full shrink-0 ${getColorClass(item.color)}`} />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {item.coffeeName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.doseTypeName}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-mono text-muted-foreground">
-                      {item.count}
-                    </span>
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  </div>
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    {item.count} {item.count === 1 ? "dose" : "doses"}
+                  </Badge>
                 </div>
               </Link>
             ))}
@@ -274,7 +269,31 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* F) Freshness Hint */}
+      {/* Go-To Coffee */}
+      {!isLoading && data?.goTo && (
+        <section className="mb-6" aria-label="Your favorite">
+          <Link href={`/coffees/${data.goTo.coffeeId}`}>
+            <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
+              <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Sparkles className="size-4 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground">
+                  Your go-to lately
+                </p>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {data.goTo.coffeeName}
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground shrink-0">
+                {data.goTo.brewCount}x this month
+              </span>
+            </div>
+          </Link>
+        </section>
+      )}
+
+      {/* Freshness Hint */}
       {!isLoading && data?.peakFreshnessCount > 0 && (
         <section aria-label="Freshness hint">
           <p className="text-center text-xs text-muted-foreground">
