@@ -45,6 +45,7 @@ export interface FillSession {
   roastDate: string;
   gramsPerDose: number;
   filledAt: Date;
+  usedAt?: Date | null;
   status: "FULL" | "USED" | "ARCHIVED";
 }
 

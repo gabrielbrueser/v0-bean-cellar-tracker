@@ -9,7 +9,11 @@ export async function GET(
   const { id: vialId } = await params;
   const sql = getDb();
   const rows = await sql`
-    SELECT * FROM fill_sessions WHERE vial_id = ${vialId} ORDER BY filled_at DESC
+    SELECT fs.*, ul.timestamp as used_at
+    FROM fill_sessions fs
+    LEFT JOIN usage_logs ul ON ul.fill_session_id = fs.id
+    WHERE fs.vial_id = ${vialId} 
+    ORDER BY fs.filled_at DESC
   `;
   const sessions = rows.map((r) => ({
     id: r.id,
@@ -19,6 +23,7 @@ export async function GET(
     roastDate: r.roast_date,
     gramsPerDose: r.grams_per_dose,
     filledAt: r.filled_at,
+    usedAt: r.used_at,
     status: r.status,
   }));
   return NextResponse.json(sessions);

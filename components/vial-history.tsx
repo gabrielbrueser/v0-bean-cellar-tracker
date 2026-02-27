@@ -19,7 +19,10 @@ function HistoryItem({ session }: { session: FillSession }) {
           {format(new Date(session.roastDate), "MMM d, yyyy")}
         </p>
         <p className="text-xs text-muted-foreground">
-          Filled {format(session.filledAt, "MMM d, yyyy")}
+          Filled {format(new Date(session.filledAt), "MMM d, yyyy")}
+          {session.usedAt && (
+            <> &middot; Used {format(new Date(session.usedAt), "MMM d, yyyy")}</>
+          )}
         </p>
       </div>
       <Badge
