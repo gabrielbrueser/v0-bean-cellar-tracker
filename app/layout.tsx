@@ -3,7 +3,6 @@ import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "sonner";
 import { BottomNav } from "@/components/bottom-nav";
-import { FirebaseInit } from "@/components/firebase-init";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -38,7 +37,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
       <body className="font-sans antialiased">
-        <FirebaseInit />
         <main className="min-h-screen pb-20">{children}</main>
         <BottomNav />
         <Toaster position="top-center" richColors />

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { QRScanner } from "@/components/qr-scanner";
 import { InventorySummary } from "@/components/inventory-summary";
 import { SearchBar } from "@/components/search-bar";
-import { getVialByQr } from "@/lib/firestore";
+
 
 export default function HomePage() {
   const router = useRouter();
@@ -15,7 +15,10 @@ export default function HomePage() {
   const handleScan = useCallback(
     async (value: string) => {
       try {
-        const vial = await getVialByQr(value);
+        const res = await fetch(
+          `/api/vials/lookup?qr=${encodeURIComponent(value)}`
+        );
+        const vial = await res.json();
         if (vial) {
           router.push(`/vials/${vial.id}`);
         } else {

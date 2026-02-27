@@ -1,56 +1,52 @@
 "use client";
 
 import useSWR from "swr";
-import {
-  getInventorySummary,
-  getVials,
-  getCoffees,
-  getDoseTypes,
-  getProcessMethods,
-  getVial,
-  getActiveFillSession,
-  getFillSessionsForVial,
-  getCoffee,
-} from "./firestore";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function useInventory() {
-  return useSWR("inventory", getInventorySummary);
+  return useSWR("/api/inventory", fetcher);
 }
 
 export function useVials() {
-  return useSWR("vials", getVials);
+  return useSWR("/api/vials", fetcher);
 }
 
 export function useCoffees() {
-  return useSWR("coffees", getCoffees);
+  return useSWR("/api/coffees", fetcher);
 }
 
 export function useDoseTypes() {
-  return useSWR("doseTypes", getDoseTypes);
+  return useSWR("/api/dose-types", fetcher);
 }
 
 export function useProcessMethods() {
-  return useSWR("processMethods", getProcessMethods);
+  return useSWR("/api/process-methods", fetcher);
 }
 
 export function useVial(id: string | null) {
-  return useSWR(id ? `vial-${id}` : null, () => (id ? getVial(id) : null));
+  return useSWR(id ? `/api/vials/${id}` : null, fetcher);
 }
 
 export function useActiveFillSession(vialId: string | null) {
-  return useSWR(vialId ? `fill-active-${vialId}` : null, () =>
-    vialId ? getActiveFillSession(vialId) : null
+  const { data: sessions, ...rest } = useSWR(
+    vialId ? `/api/vials/${vialId}/fill-sessions` : null,
+    fetcher
   );
+  // The active fill is the first one with status FULL
+  const activeFill = sessions?.find(
+    (s: { status: string }) => s.status === "FULL"
+  );
+  return { data: activeFill ?? null, ...rest };
 }
 
 export function useFillSessions(vialId: string | null) {
-  return useSWR(vialId ? `fill-sessions-${vialId}` : null, () =>
-    vialId ? getFillSessionsForVial(vialId) : null
+  return useSWR(
+    vialId ? `/api/vials/${vialId}/fill-sessions` : null,
+    fetcher
   );
 }
 
 export function useCoffee(id: string | null) {
-  return useSWR(id ? `coffee-${id}` : null, () =>
-    id ? getCoffee(id) : null
-  );
+  return useSWR(id ? `/api/coffees/${id}` : null, fetcher);
 }

@@ -13,14 +13,13 @@ export function useVialAction(vialId: string) {
     if (!activeFill) return;
     setLoading(true);
     try {
-      const { useVial } = await import("./firestore");
-      await useVial(activeFill.id, vialId);
+      const res = await fetch(`/api/vials/${vialId}/use`, { method: "POST" });
+      if (!res.ok) throw new Error("Failed");
       toast.success("Coffee used!", { description: "Vial marked as empty." });
-      mutate(`vial-${vialId}`);
-      mutate(`fill-active-${vialId}`);
-      mutate(`fill-sessions-${vialId}`);
-      mutate("inventory");
-      mutate("vials");
+      mutate(`/api/vials/${vialId}`);
+      mutate(`/api/vials/${vialId}/fill-sessions`);
+      mutate("/api/inventory");
+      mutate("/api/vials");
     } catch {
       toast.error("Failed to mark vial as used");
     } finally {
