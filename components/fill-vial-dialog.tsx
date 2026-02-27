@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { mutate } from "swr";
 import { toast } from "sonner";
 import {
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCoffees } from "@/lib/hooks";
+import { useCoffees, useDoseTypes } from "@/lib/hooks";
 import { CoffeeForm } from "@/components/coffee-form";
 
 interface FillVialDialogProps {
@@ -40,14 +40,28 @@ export function FillVialDialog({
   hasActiveFill,
 }: FillVialDialogProps) {
   const { data: coffees } = useCoffees();
+  const { data: doseTypes } = useDoseTypes();
   const [coffeeId, setCoffeeId] = useState("");
   const [roastDate, setRoastDate] = useState("");
+  const [grams, setGrams] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
   const [showNewCoffee, setShowNewCoffee] = useState(false);
+
+  // Set default grams from dose type when dialog opens
+  const currentDoseType = doseTypes?.find((dt) => dt.id === doseTypeId);
+  useEffect(() => {
+    if (open && currentDoseType) {
+      setGrams(currentDoseType.gramsPerDose);
+    }
+  }, [open, currentDoseType]);
 
   const handleFill = async () => {
     if (!coffeeId || !roastDate) {
       toast.error("Please select a coffee and enter a roast date");
+      return;
+    }
+    if (!grams || grams <= 0) {
+      toast.error("Please enter a valid grammage");
       return;
     }
     setLoading(true);
@@ -55,9 +69,9 @@ export function FillVialDialog({
       await fetch(`/api/vials/${vialId}/fill`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ coffeeId, doseTypeId, roastDate }),
+        body: JSON.stringify({ coffeeId, doseTypeId, roastDate, gramsPerDose: grams }),
       });
-      toast.success("Vial filled!", { description: "Ready for brewing." });
+      toast.success("Vial filled!", { description: `${grams}g ready for brewing.` });
       mutate(`vial-${vialId}`);
       mutate(`fill-active-${vialId}`);
       mutate(`fill-sessions-${vialId}`);
@@ -66,6 +80,7 @@ export function FillVialDialog({
       onOpenChange(false);
       setCoffeeId("");
       setRoastDate("");
+      setGrams("");
     } catch {
       toast.error("Failed to fill vial");
     } finally {
@@ -143,6 +158,22 @@ export function FillVialDialog({
               value={roastDate}
               onChange={(e) => setRoastDate(e.target.value)}
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="grams">Grammage (g)</Label>
+            <Input
+              id="grams"
+              type="number"
+              step="0.1"
+              min="1"
+              value={grams}
+              onChange={(e) => setGrams(e.target.value ? parseFloat(e.target.value) : "")}
+              placeholder={currentDoseType ? `Default: ${currentDoseType.gramsPerDose}g` : ""}
+            />
+            <p className="text-xs text-muted-foreground">
+              {currentDoseType ? `${currentDoseType.name} default: ${currentDoseType.gramsPerDose}g` : ""}
+            </p>
           </div>
         </div>
 

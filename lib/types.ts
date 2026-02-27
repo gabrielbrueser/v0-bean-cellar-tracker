@@ -43,6 +43,7 @@ export interface FillSession {
   coffeeId: string;
   doseTypeId: string;
   roastDate: string;
+  gramsPerDose: number;
   filledAt: Date;
   status: "FULL" | "USED" | "ARCHIVED";
 }

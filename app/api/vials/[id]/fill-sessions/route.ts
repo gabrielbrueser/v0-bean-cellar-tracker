@@ -17,6 +17,7 @@ export async function GET(
     coffeeId: r.coffee_id,
     doseTypeId: r.dose_type_id,
     roastDate: r.roast_date,
+    gramsPerDose: r.grams_per_dose,
     filledAt: r.filled_at,
     status: r.status,
   }));

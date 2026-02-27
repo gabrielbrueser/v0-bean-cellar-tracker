@@ -7,7 +7,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: vialId } = await params;
-  const { coffeeId, doseTypeId, roastDate } = await req.json();
+  const { coffeeId, doseTypeId, roastDate, gramsPerDose } = await req.json();
   const sql = getDb();
 
   // Archive any active fill session
@@ -16,10 +16,10 @@ export async function POST(
     WHERE vial_id = ${vialId} AND status = 'FULL'
   `;
 
-  // Create new fill session
+  // Create new fill session with custom grams
   const rows = await sql`
-    INSERT INTO fill_sessions (vial_id, coffee_id, dose_type_id, roast_date, status)
-    VALUES (${vialId}, ${coffeeId}, ${doseTypeId}, ${roastDate}, 'FULL')
+    INSERT INTO fill_sessions (vial_id, coffee_id, dose_type_id, roast_date, grams_per_dose, status)
+    VALUES (${vialId}, ${coffeeId}, ${doseTypeId}, ${roastDate}, ${gramsPerDose}, 'FULL')
     RETURNING *
   `;
 
@@ -33,6 +33,7 @@ export async function POST(
     coffeeId: r.coffee_id,
     doseTypeId: r.dose_type_id,
     roastDate: r.roast_date,
+    gramsPerDose: r.grams_per_dose,
     filledAt: r.filled_at,
     status: r.status,
   });

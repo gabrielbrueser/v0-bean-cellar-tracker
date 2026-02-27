@@ -68,7 +68,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
             {vial.vialCode}
           </h1>
           <p className="text-xs text-muted-foreground">
-            {doseType?.name} ({doseType?.gramsPerDose}g)
+            {doseType?.name} ({activeFill?.gramsPerDose ?? doseType?.gramsPerDose}g)
           </p>
         </div>
         <Badge
@@ -138,10 +138,13 @@ export function VialDetail({ vialId }: VialDetailProps) {
                 )}
               </div>
               {activeFill && (
-                <div className="mt-2 border-t border-border pt-2">
+                <div className="mt-2 border-t border-border pt-2 flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">
                     Roast date:{" "}
                     {format(new Date(activeFill.roastDate), "MMM d, yyyy")}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Dose: <span className="font-medium text-foreground">{activeFill.gramsPerDose}g</span>
                   </span>
                 </div>
               )}
