@@ -1,13 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Coffee, Loader2 } from "lucide-react";
+
+const ERROR_MESSAGES: Record<string, string> = {
+  Configuration: "Server configuration error. Please ensure AUTH_SECRET is set in environment variables.",
+  CredentialsSignin: "Invalid email or password.",
+  Default: "An error occurred during sign in.",
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -15,6 +21,15 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Handle error from URL params (e.g., redirected from Auth.js error)
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      setError(ERROR_MESSAGES[errorParam] || ERROR_MESSAGES.Default);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
