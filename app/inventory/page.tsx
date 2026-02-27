@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useAllVials } from "@/lib/hooks";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Package, ChevronRight, QrCode, Filter } from "lucide-react";
+import { QRCodeSVG, getVialQRUrl } from "@/components/qr-code";
+import { Package, ChevronRight, QrCode, Filter, ExternalLink } from "lucide-react";
 
 interface VialItem {
   id: string;
@@ -33,8 +34,10 @@ export default function InventoryPage() {
   const { data, isLoading } = useAllVials(filter);
   const [selectedVial, setSelectedVial] = useState<VialItem | null>(null);
 
-  const fullCount = data?.filter((v: VialItem) => v.status === "FULL").length ?? 0;
-  const emptyCount = data?.filter((v: VialItem) => v.status === "EMPTY").length ?? 0;
+  const fullCount =
+    data?.filter((v: VialItem) => v.status === "FULL").length ?? 0;
+  const emptyCount =
+    data?.filter((v: VialItem) => v.status === "EMPTY").length ?? 0;
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6">
@@ -123,7 +126,9 @@ export default function InventoryPage() {
                         {vial.vialCode}
                       </span>
                       <Badge
-                        variant={vial.status === "FULL" ? "default" : "secondary"}
+                        variant={
+                          vial.status === "FULL" ? "default" : "secondary"
+                        }
                         className="text-xs"
                       >
                         {vial.status}
@@ -151,7 +156,9 @@ export default function InventoryPage() {
       <Dialog open={!!selectedVial} onOpenChange={() => setSelectedVial(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-mono">{selectedVial?.vialCode}</DialogTitle>
+            <DialogTitle className="font-mono">
+              {selectedVial?.vialCode}
+            </DialogTitle>
           </DialogHeader>
           {selectedVial && <QRCodeDisplay vial={selectedVial} />}
           <div className="flex gap-2 mt-4">
@@ -171,110 +178,32 @@ export default function InventoryPage() {
 }
 
 function QRCodeDisplay({ vial }: { vial: VialItem }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const size = 200;
-    canvas.width = size;
-    canvas.height = size;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, size, size);
-
-    drawQR(ctx, vial.qrValue, 10, 10, 180);
-  }, [vial.qrValue]);
+  const qrUrl = getVialQRUrl(vial.vialCode);
 
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="rounded-lg border border-border bg-white p-4">
-        <canvas ref={canvasRef} style={{ imageRendering: "pixelated" }} />
+        <QRCodeSVG value={qrUrl} size={200} />
       </div>
       <div className="text-center">
-        <p className="font-mono text-xs text-muted-foreground">{vial.qrValue}</p>
+        <p className="font-mono text-xs text-muted-foreground break-all">
+          {qrUrl}
+        </p>
+        <a
+          href={qrUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+        >
+          <ExternalLink className="size-3" />
+          Test link
+        </a>
         {vial.status === "FULL" && vial.coffeeName && (
-          <p className="text-sm text-foreground mt-1">
+          <p className="text-sm text-foreground mt-2">
             {vial.coffeeName} - {vial.roaster}
           </p>
         )}
       </div>
     </div>
   );
-}
-
-// QR code drawing functions
-function drawQR(
-  ctx: CanvasRenderingContext2D,
-  data: string,
-  x: number,
-  y: number,
-  size: number
-) {
-  const modules = 21;
-  const moduleSize = size / modules;
-
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    hash = (hash * 31 + data.charCodeAt(i)) & 0xffffffff;
-  }
-
-  ctx.fillStyle = "#000000";
-
-  drawFinderPattern(ctx, x, y, moduleSize);
-  drawFinderPattern(ctx, x + (modules - 7) * moduleSize, y, moduleSize);
-  drawFinderPattern(ctx, x, y + (modules - 7) * moduleSize, moduleSize);
-
-  const rng = seedRandom(hash);
-  for (let row = 0; row < modules; row++) {
-    for (let col = 0; col < modules; col++) {
-      if (
-        (row < 8 && col < 8) ||
-        (row < 8 && col >= modules - 8) ||
-        (row >= modules - 8 && col < 8)
-      ) {
-        continue;
-      }
-
-      if (rng() > 0.5) {
-        ctx.fillRect(
-          x + col * moduleSize,
-          y + row * moduleSize,
-          moduleSize,
-          moduleSize
-        );
-      }
-    }
-  }
-}
-
-function drawFinderPattern(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  moduleSize: number
-) {
-  ctx.fillStyle = "#000000";
-  ctx.fillRect(x, y, moduleSize * 7, moduleSize * 7);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(x + moduleSize, y + moduleSize, moduleSize * 5, moduleSize * 5);
-  ctx.fillStyle = "#000000";
-  ctx.fillRect(
-    x + moduleSize * 2,
-    y + moduleSize * 2,
-    moduleSize * 3,
-    moduleSize * 3
-  );
-}
-
-function seedRandom(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
 }
