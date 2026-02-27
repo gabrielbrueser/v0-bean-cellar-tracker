@@ -118,16 +118,18 @@ export function LabelScanner({
         body: JSON.stringify({ image: capturedImage }),
       });
 
+      const result = await response.json();
+      
       if (!response.ok) {
-        throw new Error("Failed to analyze");
+        throw new Error(result.error || "Failed to analyze");
       }
 
-      const { data } = await response.json();
-      setExtractedData(data);
+      setExtractedData(result.data);
       setMode("result");
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
       toast.error("Failed to analyze label", {
-        description: "Please try again with a clearer image.",
+        description: message,
       });
     } finally {
       setIsAnalyzing(false);
