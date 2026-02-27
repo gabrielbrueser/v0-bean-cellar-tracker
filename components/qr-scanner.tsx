@@ -2,23 +2,35 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, X, Loader2 } from "lucide-react";
-import jsQR from "jsqr";
+import { Input } from "@/components/ui/input";
+import { Camera, X, Loader2, Keyboard } from "lucide-react";
 
 interface QRScannerProps {
   onScan: (value: string) => void;
   onClose?: () => void;
 }
 
+// Check if BarcodeDetector is available
+function isBarcodeDetectorSupported(): boolean {
+  return typeof window !== "undefined" && "BarcodeDetector" in window;
+}
+
 export function QRScanner({ onScan, onClose }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const detectorRef = useRef<BarcodeDetector | null>(null);
   const animationRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [initializing, setInitializing] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualCode, setManualCode] = useState("");
+  const [isSupported, setIsSupported] = useState(true);
   const scanningRef = useRef(false);
+
+  useEffect(() => {
+    setIsSupported(isBarcodeDetectorSupported());
+  }, []);
 
   const stopStream = useCallback(() => {
     scanningRef.current = false;
@@ -34,45 +46,29 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
   }, []);
 
   const startScanning = useCallback(async () => {
+    if (!isSupported) {
+      setShowManualEntry(true);
+      return;
+    }
+
     try {
       setError(null);
       setInitializing(true);
 
       // Check if getUserMedia is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera API not available. Please use HTTPS or a modern browser.");
+        throw new Error("Camera API not available");
       }
 
-      // Request camera with fallback constraints for iOS compatibility
-      let stream: MediaStream;
+      // Create barcode detector
+      detectorRef.current = new BarcodeDetector({ formats: ["qr_code"] });
+
+      // Request camera
+      let stream: MediaStream | null = null;
       const constraints = [
-        // Try environment-facing camera first with high resolution for better QR detection
-        { 
-          video: { 
-            facingMode: { exact: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          }, 
-          audio: false 
-        },
-        // Try environment without exact constraint
-        { 
-          video: { 
-            facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          }, 
-          audio: false 
-        },
-        // Fallback: any camera
-        { 
-          video: { 
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-          }, 
-          audio: false 
-        },
-        // Last resort: just any video
+        { video: { facingMode: { exact: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
         { video: true, audio: false },
       ];
 
@@ -85,42 +81,28 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         }
       }
 
-      // @ts-expect-error - stream will be defined if any constraint succeeded
       if (!stream) {
-        throw new Error("Could not access any camera");
+        throw new Error("Could not access camera");
       }
 
       streamRef.current = stream;
 
       const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (!video || !canvas) {
+      if (!video) {
         throw new Error("Video element not ready");
       }
 
-      // Set up video element for iOS
-      video.setAttribute("autoplay", "");
-      video.setAttribute("playsinline", "");
-      video.setAttribute("muted", "");
-      video.muted = true;
       video.srcObject = stream;
 
-      // Wait for video to be ready
       await new Promise<void>((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error("Camera initialization timeout"));
-        }, 15000);
-
+        const timeoutId = setTimeout(() => reject(new Error("Camera timeout")), 15000);
         video.onloadedmetadata = () => {
           clearTimeout(timeoutId);
-          video.play()
-            .then(() => resolve())
-            .catch((e) => reject(e));
+          video.play().then(() => resolve()).catch(reject);
         };
-
         video.onerror = () => {
           clearTimeout(timeoutId);
-          reject(new Error("Video failed to load"));
+          reject(new Error("Video failed"));
         };
       });
 
@@ -128,34 +110,20 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
       scanningRef.current = true;
       setScanning(true);
 
-      // Set up canvas for QR scanning
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) {
-        throw new Error("Canvas context not available");
-      }
+      // Scanning loop
+      const scan = async () => {
+        if (!scanningRef.current || !video || !detectorRef.current) return;
 
-      // Start scanning loop using jsQR (works on all browsers)
-      const scan = () => {
-        if (!scanningRef.current || !video || !canvas || !ctx) return;
-
-        if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
-          // Use full resolution for better QR detection
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          
-          // Try with attemptBoth for screens that might have inverted colors
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "attemptBoth",
-          });
-
-          if (code && code.data) {
-            stopStream();
-            onScan(code.data);
-            return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          try {
+            const codes = await detectorRef.current.detect(video);
+            if (codes.length > 0 && codes[0].rawValue) {
+              stopStream();
+              onScan(codes[0].rawValue);
+              return;
+            }
+          } catch {
+            // Detection failed, continue scanning
           }
         }
 
@@ -168,41 +136,82 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
     } catch (err) {
       setInitializing(false);
       stopStream();
-      
       const message = err instanceof Error ? err.message : "Unknown error";
       
-      if (message.includes("Permission") || message.includes("NotAllowed") || message.includes("denied")) {
-        setError(
-          "Camera access denied. Please allow camera permissions in Settings > Safari > Camera, then refresh."
-        );
-      } else if (message.includes("NotFound") || message.includes("DevicesNotFound")) {
-        setError("No camera found on this device.");
-      } else if (message.includes("NotReadable") || message.includes("TrackStartError")) {
-        setError("Camera is in use by another app. Please close other apps using the camera.");
-      } else if (message.includes("secure") || message.includes("HTTPS")) {
-        setError("Camera requires HTTPS. Please access the site via https://");
+      if (message.includes("Permission") || message.includes("NotAllowed")) {
+        setError("Camera access denied. Please allow camera permissions, then retry.");
       } else {
         setError(`Camera error: ${message}`);
       }
     }
-  }, [onScan, stopStream]);
+  }, [isSupported, onScan, stopStream]);
 
   useEffect(() => {
-    return () => {
-      stopStream();
-    };
+    return () => stopStream();
   }, [stopStream]);
+
+  const handleManualSubmit = () => {
+    const code = manualCode.trim().toUpperCase();
+    if (code) {
+      onScan(`bc:${code}`);
+    }
+  };
+
+  // Show manual entry for unsupported browsers
+  if (!isSupported || showManualEntry) {
+    return (
+      <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
+        <div className="text-center">
+          <p className="text-sm font-medium mb-1">Enter Vial Code Manually</p>
+          <p className="text-xs text-muted-foreground">
+            {!isSupported 
+              ? "QR scanning requires iOS 16.4+ or Chrome 88+." 
+              : "Type the code shown on your vial label."}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="e.g., ESP-001"
+            value={manualCode}
+            onChange={(e) => setManualCode(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleManualSubmit()}
+            className="font-mono"
+          />
+          <Button onClick={handleManualSubmit} disabled={!manualCode.trim()}>
+            Go
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          {isSupported && (
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+              setShowManualEntry(false);
+              startScanning();
+            }}>
+              <Camera className="size-4 mr-2" />
+              Use Camera
+            </Button>
+          )}
+          {onClose && (
+            <Button variant="ghost" size="sm" className="flex-1" onClick={onClose}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
       <div className="flex flex-col items-center gap-4 rounded-lg border border-border bg-card p-6 text-center">
         <p className="text-sm text-destructive">{error}</p>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => {
-            setError(null);
-            startScanning();
-          }}>
+          <Button variant="outline" size="sm" onClick={() => { setError(null); startScanning(); }}>
             Retry
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowManualEntry(true)}>
+            <Keyboard className="size-4 mr-2" />
+            Enter Manually
           </Button>
           {onClose && (
             <Button variant="ghost" size="sm" onClick={onClose}>
@@ -216,14 +225,16 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
 
   if (!scanning && !initializing) {
     return (
-      <Button
-        onClick={startScanning}
-        className="h-14 w-full gap-3 text-base font-semibold"
-        size="lg"
-      >
-        <Camera className="size-5" />
-        Scan QR Code
-      </Button>
+      <div className="flex flex-col gap-2">
+        <Button onClick={startScanning} className="h-14 w-full gap-3 text-base font-semibold" size="lg">
+          <Camera className="size-5" />
+          Scan QR Code
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setShowManualEntry(true)}>
+          <Keyboard className="size-4 mr-2" />
+          Enter code manually
+        </Button>
+      </div>
     );
   }
 
@@ -243,27 +254,30 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         playsInline
         muted
         autoPlay
-        style={{ transform: "scaleX(1)" }}
       />
-      <canvas ref={canvasRef} className="hidden" />
-      {/* Scan overlay */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div className="size-48 rounded-2xl border-2 border-primary/60" />
       </div>
-      {onClose && (
+      <div className="absolute top-2 right-2 flex gap-2">
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 bg-card/80 backdrop-blur-sm text-foreground"
-          onClick={() => {
-            stopStream();
-            onClose();
-          }}
+          className="bg-card/80 backdrop-blur-sm"
+          onClick={() => { stopStream(); setShowManualEntry(true); }}
         >
-          <X className="size-4" />
-          <span className="sr-only">Close scanner</span>
+          <Keyboard className="size-4" />
         </Button>
-      )}
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="bg-card/80 backdrop-blur-sm"
+            onClick={() => { stopStream(); onClose(); }}
+          >
+            <X className="size-4" />
+          </Button>
+        )}
+      </div>
       <p className="bg-card/80 backdrop-blur-sm py-2 text-center text-sm text-muted-foreground">
         Point camera at a vial QR code
       </p>
