@@ -26,7 +26,18 @@ export async function GET() {
 // POST /api/vials — create a new vial
 export async function POST(req: NextRequest) {
   try {
-    const { doseTypeId } = await req.json();
+    const body = await req.json();
+    const { doseTypeId } = body;
+    
+    if (!doseTypeId) {
+      return NextResponse.json({ error: "doseTypeId is required" }, { status: 400 });
+    }
+
+    if (!process.env.DATABASE_URL) {
+      console.error("[v0] DATABASE_URL not configured");
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    }
+
     const sql = getDb();
 
     // Get dose type prefix
@@ -64,9 +75,10 @@ export async function POST(req: NextRequest) {
       status: r.status,
     });
   } catch (error) {
-    console.error("Failed to create vial:", error);
+    console.error("[v0] Failed to create vial:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to create vial" },
+      { error: `Failed to create vial: ${message}` },
       { status: 500 }
     );
   }
