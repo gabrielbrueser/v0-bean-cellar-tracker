@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/select";
 import { useProcessMethods } from "@/lib/hooks";
 import type { Coffee } from "@/lib/types";
+import { LabelScanner } from "@/components/label-scanner";
+import { Camera } from "lucide-react";
 
 interface CoffeeFormProps {
   coffee?: Coffee;
@@ -28,6 +30,7 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
   const [loading, setLoading] = useState(false);
   const [showCustomProcess, setShowCustomProcess] = useState(false);
   const [customProcess, setCustomProcess] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
 
   const [form, setForm] = useState({
     roaster: coffee?.roaster ?? "Tanat",
@@ -53,6 +56,48 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
       return;
     }
     handleChange("processMethodId", value);
+  };
+
+  const handleScanData = (data: {
+    coffeeName: string | null;
+    roaster: string | null;
+    origin: string | null;
+    producer: string | null;
+    variety: string | null;
+    altitude: string | null;
+    processMethod: string | null;
+    tastingNotes: string | null;
+    score: number | null;
+  }) => {
+    // Auto-fill form with extracted data
+    if (data.coffeeName) handleChange("coffeeName", data.coffeeName);
+    if (data.roaster) handleChange("roaster", data.roaster);
+    if (data.origin) handleChange("origin", data.origin);
+    if (data.producer) handleChange("producer", data.producer);
+    if (data.variety) handleChange("variety", data.variety);
+    if (data.altitude) handleChange("altitude", data.altitude);
+    if (data.tastingNotes) handleChange("tastingNotes", data.tastingNotes);
+    if (data.score) handleChange("score", data.score);
+
+    // Try to match process method
+    if (data.processMethod && processMethods) {
+      const matchedProcess = processMethods.find(
+        (pm) =>
+          pm.name.toLowerCase().includes(data.processMethod!.toLowerCase()) ||
+          data.processMethod!.toLowerCase().includes(pm.name.toLowerCase())
+      );
+      if (matchedProcess) {
+        handleChange("processMethodId", matchedProcess.id);
+      } else {
+        // Set custom process for user to add
+        setCustomProcess(data.processMethod);
+        setShowCustomProcess(true);
+      }
+    }
+
+    toast.success("Label data imported!", {
+      description: "Review and adjust the fields as needed.",
+    });
   };
 
   const handleAddCustomProcess = async () => {
@@ -111,6 +156,19 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Scan Label Button */}
+      {!coffee && (
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2 w-full border-dashed"
+          onClick={() => setShowScanner(true)}
+        >
+          <Camera className="size-4" />
+          Scan Coffee Label
+        </Button>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="cf-name">Coffee Name *</Label>
@@ -253,6 +311,13 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
           {loading ? "Saving..." : coffee ? "Update" : "Create"}
         </Button>
       </div>
+
+      {/* Label Scanner Dialog */}
+      <LabelScanner
+        open={showScanner}
+        onOpenChange={setShowScanner}
+        onDataExtracted={handleScanData}
+      />
     </div>
   );
 }
