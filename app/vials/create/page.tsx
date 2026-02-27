@@ -26,13 +26,17 @@ export default function CreateVialPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doseTypeId }),
       });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Server error" }));
+        throw new Error(errorData.error || "Failed to create vial");
+      }
       const vial = await res.json();
       setCreatedVialId(vial.id);
       setCreatedVialCode(vial.vialCode);
       toast.success(`Vial ${vial.vialCode} created!`);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create vial");
+      toast.error(err instanceof Error ? err.message : "Failed to create vial");
     } finally {
       setLoading(false);
     }
