@@ -84,7 +84,7 @@ export default function InventoryPage() {
       {isLoading ? (
         <div className="flex flex-col gap-3">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-20 w-full rounded-xl" />
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
           ))}
         </div>
       ) : !data || data.length === 0 ? (
@@ -117,32 +117,40 @@ export default function InventoryPage() {
                 onClick={() => setSelectedVial(vial)}
               >
                 <CardContent className="flex items-center gap-3 p-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
                     <QrCode className="size-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
+                    {/* Big title: Coffee name or "Empty" */}
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-medium text-foreground">
-                        {vial.vialCode}
+                      <span className="font-bold text-foreground truncate">
+                        {vial.status === "FULL" && vial.coffeeName
+                          ? vial.coffeeName
+                          : "Empty Vial"}
                       </span>
                       <Badge
-                        variant={
-                          vial.status === "FULL" ? "default" : "secondary"
-                        }
-                        className="text-xs"
+                        variant={vial.status === "FULL" ? "default" : "secondary"}
+                        className="text-xs shrink-0"
                       >
                         {vial.status}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {vial.status === "FULL" && vial.coffeeName
-                        ? `${vial.coffeeName} - ${vial.roaster}`
-                        : `${vial.doseTypeName} (${vial.gramsPerDose}g)`}
+                    {/* Secondary: Roaster + dose info */}
+                    <p className="text-sm text-muted-foreground truncate">
+                      {vial.status === "FULL" && vial.roaster
+                        ? `${vial.roaster} · `
+                        : ""}
+                      {vial.doseTypeName} ({vial.gramsPerDose}g)
+                    </p>
+                    {/* Small: Vial code */}
+                    <p className="text-xs text-muted-foreground/70 font-mono">
+                      {vial.vialCode}
                     </p>
                   </div>
                   <Link
                     href={`/vials/${vial.id}`}
                     onClick={(e) => e.stopPropagation()}
+                    className="shrink-0"
                   >
                     <ChevronRight className="size-4 text-muted-foreground" />
                   </Link>
@@ -199,9 +207,10 @@ function QRCodeDisplay({ vial }: { vial: VialItem }) {
           Test link
         </a>
         {vial.status === "FULL" && vial.coffeeName && (
-          <p className="text-sm text-foreground mt-2">
-            {vial.coffeeName} - {vial.roaster}
-          </p>
+          <div className="mt-2">
+            <p className="font-bold text-foreground">{vial.coffeeName}</p>
+            <p className="text-sm text-muted-foreground">{vial.roaster}</p>
+          </div>
         )}
       </div>
     </div>

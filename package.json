@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.0",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
     "@hookform/resolvers": "^3.9.1",
     "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-accordion": "1.2.12",

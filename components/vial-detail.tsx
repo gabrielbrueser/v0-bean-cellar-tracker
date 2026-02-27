@@ -1,14 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { mutate } from "swr";
+import { toast } from "sonner";
 import { useVial, useActiveFillSession, useFillSessions, useCoffee, useDoseTypes } from "@/lib/hooks";
-import { useVialAction } from "@/lib/use-vial-action";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { FillVialDialog } from "@/components/fill-vial-dialog";
 import { VialHistory } from "@/components/vial-history";
 import { ArrowLeft, Printer, Coffee, Droplets } from "lucide-react";
@@ -24,9 +35,47 @@ export function VialDetail({ vialId }: VialDetailProps) {
   const { data: coffee } = useCoffee(activeFill?.coffeeId ?? null);
   const { data: doseTypes } = useDoseTypes();
   const [showFillDialog, setShowFillDialog] = useState(false);
-  const { handleUse, loading: useLoading } = useVialAction(vialId);
+  const [showUseDialog, setShowUseDialog] = useState(false);
+  const [brewType, setBrewType] = useState<string>("espresso");
+  const [useLoading, setUseLoading] = useState(false);
 
   const doseType = doseTypes?.find((dt) => dt.id === vial?.doseTypeId);
+
+  // Determine default brew type based on vial prefix
+  const getDefaultBrewType = useCallback(() => {
+    if (vial?.vialCode?.startsWith("ESP")) return "espresso";
+    if (vial?.vialCode?.startsWith("FLT")) return "filter";
+    return "espresso";
+  }, [vial?.vialCode]);
+
+  const handleUseClick = () => {
+    setBrewType(getDefaultBrewType());
+    setShowUseDialog(true);
+  };
+
+  const handleConfirmUse = async () => {
+    if (!activeFill) return;
+    setUseLoading(true);
+    try {
+      const res = await fetch(`/api/vials/${vialId}/use`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brewType }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Coffee used!", { description: `Brewed as ${brewType}. Vial marked as empty.` });
+      setShowUseDialog(false);
+      mutate(`/api/vials/${vialId}`);
+      mutate(`/api/vials/${vialId}/fill-sessions`);
+      mutate("/api/inventory");
+      mutate("/api/vials");
+      mutate("/api/activity");
+    } catch {
+      toast.error("Failed to mark vial as used");
+    } finally {
+      setUseLoading(false);
+    }
+  };
 
   if (vialLoading) {
     return (
@@ -168,13 +217,13 @@ export function VialDetail({ vialId }: VialDetailProps) {
           </Card>
 
           <Button
-            onClick={handleUse}
+            onClick={handleUseClick}
             disabled={useLoading}
             className="h-14 w-full gap-3 text-base font-bold bg-accent text-accent-foreground hover:bg-accent/90"
             size="lg"
           >
             <Droplets className="size-5" />
-            {useLoading ? "Marking as used..." : "Use this coffee for my brew"}
+            Use this coffee for my brew
           </Button>
         </>
       ) : (
@@ -212,6 +261,44 @@ export function VialDetail({ vialId }: VialDetailProps) {
         doseTypeId={vial.doseTypeId}
         hasActiveFill={!!activeFill}
       />
+
+      {/* Brew Type Selection Dialog */}
+      <Dialog open={showUseDialog} onOpenChange={setShowUseDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Log Your Brew</DialogTitle>
+            <DialogDescription>
+              Select the brew method for this coffee
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <RadioGroup value={brewType} onValueChange={setBrewType} className="gap-3">
+              <div className="flex items-center space-x-3 rounded-lg border border-border p-3 hover:bg-secondary/50 cursor-pointer">
+                <RadioGroupItem value="espresso" id="espresso" />
+                <Label htmlFor="espresso" className="flex-1 cursor-pointer">
+                  <span className="font-medium">Espresso</span>
+                  <p className="text-xs text-muted-foreground">Pressure brewed, concentrated shot</p>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-3 rounded-lg border border-border p-3 hover:bg-secondary/50 cursor-pointer">
+                <RadioGroupItem value="filter" id="filter" />
+                <Label htmlFor="filter" className="flex-1 cursor-pointer">
+                  <span className="font-medium">Filter</span>
+                  <p className="text-xs text-muted-foreground">Pour-over, drip, or immersion brew</p>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUseDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmUse} disabled={useLoading}>
+              {useLoading ? "Logging..." : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

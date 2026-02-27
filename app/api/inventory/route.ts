@@ -40,6 +40,7 @@ export async function GET() {
     gramsPerDose: r.grams_per_dose,
     count: r.count,
     vials: r.vials,
+    firstVialCode: r.vials && r.vials.length > 0 ? r.vials[0].vialCode : null,
   }));
 
   return NextResponse.json(groups);

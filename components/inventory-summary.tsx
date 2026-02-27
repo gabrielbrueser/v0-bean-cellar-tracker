@@ -7,6 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package } from "lucide-react";
 
+interface InventoryGroup {
+  coffeeId: string;
+  coffeeName: string;
+  roaster: string;
+  doseTypeId: string;
+  doseTypeName: string;
+  gramsPerDose: number;
+  count: number;
+  vials?: Array<{ id: string; vialCode: string }>;
+  firstVialCode?: string;
+}
+
 export function InventorySummary() {
   const { data, isLoading, error } = useInventory();
 
@@ -14,7 +26,7 @@ export function InventorySummary() {
     return (
       <div className="flex flex-col gap-3">
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-20 w-full rounded-xl" />
+          <Skeleton key={i} className="h-24 w-full rounded-xl" />
         ))}
       </div>
     );
@@ -24,7 +36,7 @@ export function InventorySummary() {
     return (
       <Card>
         <CardContent className="py-8 text-center text-sm text-muted-foreground">
-          Could not load inventory. Check your Firebase connection.
+          Could not load inventory. Check your database connection.
         </CardContent>
       </Card>
     );
@@ -50,25 +62,34 @@ export function InventorySummary() {
 
   return (
     <div className="flex flex-col gap-3">
-      {data.map((group) => (
+      {(data as InventoryGroup[]).map((group) => (
         <Link
           key={`${group.coffeeId}__${group.doseTypeId}`}
           href={`/inventory?coffee=${group.coffeeId}&dose=${group.doseTypeId}`}
         >
           <Card className="transition-colors hover:bg-secondary/50">
-            <CardContent className="flex items-center justify-between py-0">
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-semibold text-foreground">
+            <CardContent className="flex items-center justify-between py-3">
+              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                {/* Big title: Coffee name */}
+                <span className="text-base font-bold text-foreground truncate">
                   {group.coffeeName}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {group.roaster} &middot; {group.doseTypeName} (
-                  {group.gramsPerDose}g)
+                {/* Secondary: Roaster + Dose type */}
+                <span className="text-sm text-muted-foreground">
+                  {group.roaster} &middot; {group.doseTypeName} ({group.gramsPerDose}g)
+                </span>
+                {/* Small line: Vial codes */}
+                <span className="text-xs text-muted-foreground/70 font-mono">
+                  {group.count === 1 && group.firstVialCode
+                    ? group.firstVialCode
+                    : group.firstVialCode
+                    ? `${group.firstVialCode} + ${group.count - 1} more`
+                    : `${group.count} vials`}
                 </span>
               </div>
               <Badge
                 variant="secondary"
-                className="bg-primary/10 text-primary font-bold text-base px-3 py-1"
+                className="bg-primary/10 text-primary font-bold text-lg px-3 py-1 shrink-0"
               >
                 {group.count}
               </Badge>
