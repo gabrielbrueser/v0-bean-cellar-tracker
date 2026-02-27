@@ -63,3 +63,7 @@ export function useAllVials(status?: "FULL" | "EMPTY" | null) {
 export function useCoffeeTimeline(coffeeId: string | null) {
   return useSWR(coffeeId ? `/api/coffees/${coffeeId}/timeline` : null, fetcher);
 }
+
+export function useHomeData() {
+  return useSWR("/api/home", fetcher);
+}
