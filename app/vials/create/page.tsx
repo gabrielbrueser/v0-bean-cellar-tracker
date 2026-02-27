@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useDoseTypes } from "@/lib/hooks";
-import { createVial } from "@/lib/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Beaker, Printer } from "lucide-react";
 import Link from "next/link";
@@ -22,7 +21,12 @@ export default function CreateVialPage() {
   const handleCreate = async (doseTypeId: string) => {
     setLoading(true);
     try {
-      const vial = await createVial(doseTypeId);
+      const res = await fetch("/api/vials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doseTypeId }),
+      });
+      const vial = await res.json();
       setCreatedVialId(vial.id);
       setCreatedVialCode(vial.vialCode);
       toast.success(`Vial ${vial.vialCode} created!`);

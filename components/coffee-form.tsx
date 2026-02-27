@@ -15,7 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useProcessMethods } from "@/lib/hooks";
-import { createCoffee, updateCoffee, addProcessMethod } from "@/lib/firestore";
 import type { Coffee } from "@/lib/types";
 
 interface CoffeeFormProps {
@@ -59,7 +58,12 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
   const handleAddCustomProcess = async () => {
     if (!customProcess.trim()) return;
     try {
-      const pm = await addProcessMethod(customProcess.trim());
+      const res = await fetch("/api/process-methods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: customProcess.trim() }),
+      });
+      const pm = await res.json();
       handleChange("processMethodId", pm.id);
       setShowCustomProcess(false);
       setCustomProcess("");
@@ -78,13 +82,22 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
     setLoading(true);
     try {
       if (coffee) {
-        await updateCoffee(coffee.id, form);
-        const updated = { ...coffee, ...form };
+        const res = await fetch(`/api/coffees/${coffee.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        const updated = await res.json();
         mutate("coffees");
         onSave(updated);
         toast.success("Coffee updated");
       } else {
-        const created = await createCoffee(form);
+        const res = await fetch("/api/coffees", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        const created = await res.json();
         mutate("coffees");
         onSave(created);
         toast.success("Coffee created");

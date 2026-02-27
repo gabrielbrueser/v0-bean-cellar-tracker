@@ -22,7 +22,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCoffees } from "@/lib/hooks";
-import { fillVial } from "@/lib/firestore";
 import { CoffeeForm } from "@/components/coffee-form";
 
 interface FillVialDialogProps {
@@ -53,7 +52,11 @@ export function FillVialDialog({
     }
     setLoading(true);
     try {
-      await fillVial(vialId, coffeeId, doseTypeId, roastDate);
+      await fetch(`/api/vials/${vialId}/fill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coffeeId, doseTypeId, roastDate }),
+      });
       toast.success("Vial filled!", { description: "Ready for brewing." });
       mutate(`vial-${vialId}`);
       mutate(`fill-active-${vialId}`);
