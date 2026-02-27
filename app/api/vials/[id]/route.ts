@@ -21,3 +21,26 @@ export async function GET(
     status: r.status,
   });
 }
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const sql = getDb();
+
+  try {
+    // Delete related records first (cascade)
+    await sql`DELETE FROM usage_logs WHERE fill_session_id IN (SELECT id FROM fill_sessions WHERE vial_id = ${id})`;
+    await sql`DELETE FROM fill_sessions WHERE vial_id = ${id}`;
+    await sql`DELETE FROM vials WHERE id = ${id}`;
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete vial:", error);
+    return NextResponse.json(
+      { error: "Failed to delete vial" },
+      { status: 500 }
+    );
+  }
+}
