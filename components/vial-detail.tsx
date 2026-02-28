@@ -24,7 +24,9 @@ import {
 } from "@/components/ui/dialog";
 import { FillVialDialog } from "@/components/fill-vial-dialog";
 import { VialHistory } from "@/components/vial-history";
-import { ArrowLeft, Printer, Coffee, Droplets, Timer, AlertTriangle, Sparkles, CheckCircle2, Zap, ThumbsUp, Turtle, Snowflake } from "lucide-react";
+import { ArrowLeft, Printer, Coffee, Droplets, Timer, AlertTriangle, Sparkles, CheckCircle2, Zap, ThumbsUp, Turtle, Snowflake, Pencil } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCoffees } from "@/lib/hooks";
 
 interface VialDetailProps {
   vialId: string;
@@ -108,12 +110,19 @@ export function VialDetail({ vialId }: VialDetailProps) {
   const { data: fillSessions } = useFillSessions(vialId);
   const { data: coffee } = useCoffee(activeFill?.coffeeId ?? null);
   const { data: doseTypes } = useDoseTypes();
+  const { data: allCoffees } = useCoffees();
   
   const [showFillDialog, setShowFillDialog] = useState(false);
   const [showBrewDialog, setShowBrewDialog] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [brewLoading, setBrewLoading] = useState(false);
   const [freezeLoading, setFreezeLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  
+  // Edit form state
+  const [editCoffeeId, setEditCoffeeId] = useState<string>("");
+  const [editDoseTypeId, setEditDoseTypeId] = useState<string>("");
   
   // Brew form state
   const [brewMethod, setBrewMethod] = useState<BrewMethod>("espresso");
@@ -162,6 +171,47 @@ export function VialDetail({ vialId }: VialDetailProps) {
     setBrewFeedback("good");
     setNotes("");
     setShowBrewDialog(true);
+  };
+
+  const handleOpenEditDialog = () => {
+    setEditCoffeeId(activeFill?.coffeeId ?? "");
+    setEditDoseTypeId(vial?.doseTypeId ?? "");
+    setShowEditDialog(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!activeFill) return;
+    setEditLoading(true);
+    
+    try {
+      // Update the fill session with new coffee/dose type
+      const res = await fetch(`/api/fill-sessions/${activeFill.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coffeeId: editCoffeeId,
+          doseTypeId: editDoseTypeId,
+        }),
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to update dose");
+      }
+      
+      toast.success("Dose updated");
+      setShowEditDialog(false);
+      
+      // Refresh data
+      mutate(`/api/vials/${vialId}`);
+      mutate(`/api/vials/${vialId}/fill-sessions`);
+      mutate(`/api/vials/${vialId}/active-fill`);
+      mutate("/api/inventory");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update dose");
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const handleFreezeToggle = async () => {
@@ -287,6 +337,16 @@ export function VialDetail({ vialId }: VialDetailProps) {
             {vial.status === "FULL" ? "Sealed" : "Brewed"}
           </Badge>
         </div>
+        {isFull && (
+          <Button 
+            variant="outline" 
+            size="icon-sm"
+            onClick={handleOpenEditDialog}
+          >
+            <Pencil className="size-4" />
+            <span className="sr-only">Edit dose</span>
+          </Button>
+        )}
         <Link href={`/vials/${vialId}/label`}>
           <Button variant="outline" size="icon-sm">
             <Printer className="size-4" />
@@ -412,7 +472,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
 
       {fillSessions && fillSessions.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-foreground">History</h2>
+          <h2 className="mb-3 text-sm font-semibold text-foreground">Dose Lifecycle</h2>
           <VialHistory sessions={fillSessions} />
         </section>
       )}
@@ -639,6 +699,66 @@ export function VialDetail({ vialId }: VialDetailProps) {
               Done
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dose Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Dose</DialogTitle>
+            <DialogDescription>
+              Change the coffee or dose type for this sealed dose.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex flex-col gap-4 py-4">
+            {/* Coffee Selection */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Coffee</Label>
+              <Select value={editCoffeeId} onValueChange={setEditCoffeeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select coffee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCoffees?.map((c: { id: string; coffeeName: string; roaster: string }) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.coffeeName} ({c.roaster})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Dose Type Selection */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Dose Type</Label>
+              <Select value={editDoseTypeId} onValueChange={setEditDoseTypeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select dose type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {doseTypes?.map((dt: { id: string; name: string; gramsPerDose: number }) => (
+                    <SelectItem key={dt.id} value={dt.id}>
+                      {dt.name} ({dt.gramsPerDose}g)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveEdit} 
+              disabled={editLoading || !editCoffeeId || !editDoseTypeId}
+            >
+              {editLoading ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

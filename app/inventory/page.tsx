@@ -126,14 +126,21 @@ export default function InventoryPage() {
     setIsBrewDialogOpen(true);
   };
 
+  // Select the best dose for brewing (FIFO, prefer not frozen, not stale)
+  const selectBestDose = (group: InventoryGroup) => {
+    // Doses are already sorted by sealedAt ASC (FIFO) from the API
+    // Just return the first one - they're already the same frozen state in a group
+    return group.doses[0];
+  };
+
   const handleConfirmBrew = () => {
     if (!selectedGroup || selectedGroup.doses.length === 0) return;
     
-    // Pick the oldest sealed dose (first in the sorted array)
-    const oldestDose = selectedGroup.doses[0];
+    // Pick the best dose for brewing
+    const bestDose = selectBestDose(selectedGroup);
     
     // Navigate to vial detail page to complete the brew
-    router.push(`/vials/${oldestDose.id}?brew=true`);
+    router.push(`/vials/${bestDose.id}?brew=true`);
     setIsBrewDialogOpen(false);
   };
 
@@ -252,7 +259,16 @@ export default function InventoryPage() {
             const FreshnessIcon = freshness.icon;
             
             return (
-              <Card key={`${group.coffeeId}-${group.doseTypeId}-${group.isFrozen}-${idx}`} className="overflow-hidden">
+              <Card 
+                key={`${group.coffeeId}-${group.doseTypeId}-${group.isFrozen}-${idx}`} 
+                className="overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => {
+                  // Navigate to the first dose in the group
+                  if (group.doses.length > 0) {
+                    router.push(`/vials/${group.doses[0].id}`);
+                  }
+                }}
+              >
                 <CardContent className="p-4">
                   {/* Header row: Coffee name + freshness badge */}
                   <div className="flex items-start justify-between mb-2">
@@ -264,13 +280,21 @@ export default function InventoryPage() {
                         {group.roaster} · {group.doseTypeName} · {group.gramsPerDose}g
                       </p>
                     </div>
-                    <Badge 
-                      variant="outline" 
-                      className={`shrink-0 ml-2 ${freshness.color}`}
-                    >
-                      <FreshnessIcon className="size-3 mr-1" />
-                      {freshness.label}
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      {group.isFrozen && (
+                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                          <Snowflake className="size-3 mr-1" />
+                          Frozen
+                        </Badge>
+                      )}
+                      <Badge 
+                        variant="outline" 
+                        className={freshness.color}
+                      >
+                        <FreshnessIcon className="size-3 mr-1" />
+                        {freshness.label}
+                      </Badge>
+                    </div>
                   </div>
 
                   {/* Big count */}
@@ -279,20 +303,25 @@ export default function InventoryPage() {
                     <span className="text-sm text-muted-foreground">dose{group.count !== 1 ? "s" : ""}</span>
                   </div>
 
-                  {/* Dose IDs */}
-                  <p className="text-xs text-muted-foreground font-mono mb-4">
+                  {/* Dose IDs - compact and secondary */}
+                  <p className="text-xs text-muted-foreground font-mono mb-4 truncate">
                     {group.doses.map(d => d.vialCode).join(" · ")}
                   </p>
 
-                  {/* Actions */}
-                  <div className="flex gap-2">
+                  {/* Actions - stop propagation to prevent card click */}
+                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     <Button 
                       className="flex-1"
                       onClick={() => handleBrewClick(group)}
                     >
                       <Coffee className="size-4 mr-2" />
-                      Brew my dose
+                      Brew
                     </Button>
+                    <Link href={`/vials/${group.doses[0]?.id}`} className="flex-1">
+                      <Button variant="outline" className="w-full">
+                        View details
+                      </Button>
+                    </Link>
                     <Button
                       variant="outline"
                       size="icon"
@@ -330,7 +359,7 @@ export default function InventoryPage() {
               <div className="bg-primary/10 rounded-lg p-4 text-center">
                 <p className="text-sm text-muted-foreground mb-1">Selected dose:</p>
                 <p className="text-2xl font-bold font-mono text-primary">
-                  {selectedGroup.doses[0].vialCode}
+                  {selectBestDose(selectedGroup).vialCode}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Grab this dose from your shelf
