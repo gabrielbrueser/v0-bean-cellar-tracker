@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Coffee
 } from "lucide-react";
+import { useCellarContext } from "@/lib/cellar-context";
 
 interface Dose {
   id: string;
@@ -113,8 +114,10 @@ function getGroupKey(group: InventoryGroup): string {
 
 export default function InventoryPage() {
   const router = useRouter();
+  const { currentCellar } = useCellarContext();
   const [filter, setFilter] = useState<FilterType>("all");
-  const { data: groups, isLoading } = useSWR<InventoryGroup[]>("/api/inventory", fetcher);
+  const inventoryUrl = currentCellar?.id ? `/api/inventory?cellarId=${currentCellar.id}` : "/api/inventory";
+  const { data: groups, isLoading } = useSWR<InventoryGroup[]>(inventoryUrl, fetcher);
   const [selectedGroup, setSelectedGroup] = useState<InventoryGroup | null>(null);
   const [isBrewDialogOpen, setIsBrewDialogOpen] = useState(false);
   const [isFreezeLoading, setIsFreezeLoading] = useState(false);
@@ -177,9 +180,9 @@ export default function InventoryPage() {
     }
 
     if (successCount > 0) {
-      toast.success(`${successCount} dose${successCount !== 1 ? "s" : ""} ${action === "freeze" ? "frozen" : "unfrozen"}`);
-      mutate("/api/inventory");
-      mutate("/api/home");
+  toast.success(`${successCount} dose${successCount !== 1 ? "s" : ""} ${action === "freeze" ? "frozen" : "unfrozen"}`);
+  mutate(inventoryUrl);
+  mutate(currentCellar?.id ? `/api/home?cellarId=${currentCellar.id}` : "/api/home");
     }
     if (failCount > 0) {
       toast.error(`Failed to ${action} ${failCount} dose${failCount !== 1 ? "s" : ""}`);

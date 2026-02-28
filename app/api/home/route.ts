@@ -1,11 +1,35 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const sql = getDb();
+  const { searchParams } = new URL(req.url);
+  const cellarId = searchParams.get("cellarId");
 
-  // Get last brew from brew_logs (single source of truth)
-  const lastBrewRows = await sql`
+  // Build cellar filter - if cellarId provided, filter by it
+  // For queries joining coffees, use c.cellar_id
+  // For brew_logs, use bl.cellar_id
+
+  // Get last brew from brew_logs (single source of truth), filtered by cellar
+  const lastBrewRows = cellarId ? await sql`
+    SELECT
+      bl.id,
+      bl.brew_method,
+      bl.brew_feedback,
+      bl.grind_size,
+      bl.extraction_grams,
+      bl.dose_grams,
+      bl.created_at,
+      c.coffee_name,
+      c.roaster,
+      v.vial_code
+    FROM brew_logs bl
+    JOIN coffees c ON c.id = bl.coffee_id
+    LEFT JOIN vials v ON v.id = bl.dose_id
+    WHERE bl.cellar_id = ${cellarId}
+    ORDER BY bl.created_at DESC
+    LIMIT 1
+  ` : await sql`
     SELECT
       bl.id,
       bl.brew_method,
@@ -24,8 +48,17 @@ export async function GET() {
     LIMIT 1
   `;
 
-  // Get peak dose count for subtitle
-  const peakDoseCountRows = await sql`
+  // Get peak dose count for subtitle (filtered by cellar)
+  const peakDoseCountRows = cellarId ? await sql`
+    SELECT COUNT(*)::int as count
+    FROM fill_sessions fs
+    JOIN vials v ON v.id = fs.vial_id
+    JOIN coffees c ON c.id = fs.coffee_id
+    WHERE fs.status = 'FULL'
+      AND c.cellar_id = ${cellarId}
+      AND v.is_frozen = false
+      AND EXTRACT(DAY FROM NOW() - fs.roast_date) BETWEEN 7 AND 21
+  ` : await sql`
     SELECT COUNT(*)::int as count
     FROM fill_sessions fs
     JOIN vials v ON v.id = fs.vial_id
@@ -34,8 +67,14 @@ export async function GET() {
       AND EXTRACT(DAY FROM NOW() - fs.roast_date) BETWEEN 7 AND 21
   `;
 
-  // Get frozen dose count for subtitle
-  const frozenCountRows = await sql`
+  // Get frozen dose count for subtitle (filtered by cellar)
+  const frozenCountRows = cellarId ? await sql`
+    SELECT COUNT(*)::int as count
+    FROM fill_sessions fs
+    JOIN vials v ON v.id = fs.vial_id
+    JOIN coffees c ON c.id = fs.coffee_id
+    WHERE fs.status = 'FULL' AND v.is_frozen = true AND c.cellar_id = ${cellarId}
+  ` : await sql`
     SELECT COUNT(*)::int as count
     FROM fill_sessions fs
     JOIN vials v ON v.id = fs.vial_id
@@ -44,7 +83,35 @@ export async function GET() {
 
   // Get hero recommendations - one per method (espresso/filter)
   // Rules: not stale, prefer not frozen, oldest sealed first (FIFO)
-  const heroEspressoRows = await sql`
+  const heroEspressoRows = cellarId ? await sql`
+    SELECT
+      v.id as vial_id,
+      v.vial_code,
+      v.is_frozen,
+      fs.roast_date,
+      fs.grams_per_dose,
+      fs.sealed_at,
+      c.id as coffee_id,
+      c.coffee_name,
+      c.roaster,
+      c.origin_country,
+      c.color,
+      dt.name as dose_type_name,
+      dt.prefix,
+      EXTRACT(DAY FROM NOW() - fs.roast_date)::int as days_since_roast
+    FROM fill_sessions fs
+    JOIN vials v ON v.id = fs.vial_id
+    JOIN coffees c ON c.id = fs.coffee_id
+    JOIN dose_types dt ON dt.id = fs.dose_type_id
+    WHERE fs.status = 'FULL'
+      AND c.cellar_id = ${cellarId}
+      AND dt.prefix IN ('ESP', 'espresso')
+      AND EXTRACT(DAY FROM NOW() - fs.roast_date) <= 35
+    ORDER BY
+      v.is_frozen ASC,
+      fs.sealed_at ASC
+    LIMIT 1
+  ` : await sql`
     SELECT
       v.id as vial_id,
       v.vial_code,
@@ -73,7 +140,35 @@ export async function GET() {
     LIMIT 1
   `;
 
-  const heroFilterRows = await sql`
+  const heroFilterRows = cellarId ? await sql`
+    SELECT
+      v.id as vial_id,
+      v.vial_code,
+      v.is_frozen,
+      fs.roast_date,
+      fs.grams_per_dose,
+      fs.sealed_at,
+      c.id as coffee_id,
+      c.coffee_name,
+      c.roaster,
+      c.origin_country,
+      c.color,
+      dt.name as dose_type_name,
+      dt.prefix,
+      EXTRACT(DAY FROM NOW() - fs.roast_date)::int as days_since_roast
+    FROM fill_sessions fs
+    JOIN vials v ON v.id = fs.vial_id
+    JOIN coffees c ON c.id = fs.coffee_id
+    JOIN dose_types dt ON dt.id = fs.dose_type_id
+    WHERE fs.status = 'FULL'
+      AND c.cellar_id = ${cellarId}
+      AND dt.prefix IN ('FLT', 'filter')
+      AND EXTRACT(DAY FROM NOW() - fs.roast_date) <= 35
+    ORDER BY
+      v.is_frozen ASC,
+      fs.sealed_at ASC
+    LIMIT 1
+  ` : await sql`
     SELECT
       v.id as vial_id,
       v.vial_code,
@@ -102,8 +197,28 @@ export async function GET() {
     LIMIT 1
   `;
 
-  // Get frozen doses
-  const frozenRows = await sql`
+  // Get frozen doses (filtered by cellar)
+  const frozenRows = cellarId ? await sql`
+    SELECT
+      v.id as vial_id,
+      v.vial_code,
+      v.frozen_at,
+      fs.roast_date,
+      fs.grams_per_dose,
+      c.id as coffee_id,
+      c.coffee_name,
+      c.roaster,
+      c.color,
+      dt.name as dose_type_name,
+      dt.prefix
+    FROM fill_sessions fs
+    JOIN vials v ON v.id = fs.vial_id
+    JOIN coffees c ON c.id = fs.coffee_id
+    JOIN dose_types dt ON dt.id = fs.dose_type_id
+    WHERE fs.status = 'FULL' AND v.is_frozen = true AND c.cellar_id = ${cellarId}
+    ORDER BY v.frozen_at DESC
+    LIMIT 3
+  ` : await sql`
     SELECT
       v.id as vial_id,
       v.vial_code,
@@ -125,8 +240,14 @@ export async function GET() {
     LIMIT 3
   `;
 
-  // Get brewed this week stats (from brew_logs)
-  const weekStatsRows = await sql`
+  // Get brewed this week stats (filtered by cellar)
+  const weekStatsRows = cellarId ? await sql`
+    SELECT
+      COUNT(*)::int as cups,
+      COALESCE(SUM(dose_grams), 0)::numeric as grams
+    FROM brew_logs
+    WHERE created_at > NOW() - INTERVAL '7 days' AND cellar_id = ${cellarId}
+  ` : await sql`
     SELECT
       COUNT(*)::int as cups,
       COALESCE(SUM(dose_grams), 0)::numeric as grams
@@ -134,8 +255,14 @@ export async function GET() {
     WHERE created_at > NOW() - INTERVAL '7 days'
   `;
 
-  // Get brewed this month stats (from brew_logs)
-  const monthStatsRows = await sql`
+  // Get brewed this month stats (filtered by cellar)
+  const monthStatsRows = cellarId ? await sql`
+    SELECT
+      COUNT(*)::int as cups,
+      COALESCE(SUM(dose_grams), 0)::numeric as grams
+    FROM brew_logs
+    WHERE created_at >= DATE_TRUNC('month', NOW()) AND cellar_id = ${cellarId}
+  ` : await sql`
     SELECT
       COUNT(*)::int as cups,
       COALESCE(SUM(dose_grams), 0)::numeric as grams
@@ -181,8 +308,6 @@ export async function GET() {
   if (heroFilterRows[0]) {
     heroRecommendations.push(mapHeroRow(heroFilterRows[0]));
   }
-  // If only one method exists, could add second of same method (spec says this)
-  // For now, we show what we have
 
   const frozenDoses = frozenRows.map((r) => ({
     vialId: r.vial_id,

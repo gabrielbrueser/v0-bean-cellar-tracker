@@ -1,10 +1,34 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const sql = getDb();
+  const { searchParams } = new URL(req.url);
+  const cellarId = searchParams.get("cellarId");
 
-  const [weekStats, monthStats, allTimeStats] = await Promise.all([
+  const [weekStats, monthStats, allTimeStats] = cellarId ? await Promise.all([
+    sql`
+      SELECT 
+        COUNT(*)::int as cups,
+        COALESCE(SUM(dose_grams), 0)::numeric as grams
+      FROM brew_logs
+      WHERE created_at > NOW() - INTERVAL '7 days' AND cellar_id = ${cellarId}
+    `,
+    sql`
+      SELECT 
+        COUNT(*)::int as cups,
+        COALESCE(SUM(dose_grams), 0)::numeric as grams
+      FROM brew_logs
+      WHERE created_at >= DATE_TRUNC('month', NOW()) AND cellar_id = ${cellarId}
+    `,
+    sql`
+      SELECT 
+        COUNT(*)::int as cups,
+        COALESCE(SUM(dose_grams), 0)::numeric as grams
+      FROM brew_logs
+      WHERE cellar_id = ${cellarId}
+    `,
+  ]) : await Promise.all([
     sql`
       SELECT 
         COUNT(*)::int as cups,

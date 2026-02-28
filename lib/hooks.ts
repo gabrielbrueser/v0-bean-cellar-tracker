@@ -4,16 +4,18 @@ import useSWR from "swr";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-export function useInventory() {
-  return useSWR("/api/inventory", fetcher);
+export function useInventory(cellarId?: string | null) {
+  const url = cellarId ? `/api/inventory?cellarId=${cellarId}` : "/api/inventory";
+  return useSWR(url, fetcher);
 }
 
 export function useVials() {
   return useSWR("/api/vials", fetcher);
 }
 
-export function useCoffees() {
-  return useSWR("/api/coffees", fetcher);
+export function useCoffees(cellarId?: string | null) {
+  const url = cellarId ? `/api/coffees?cellarId=${cellarId}` : "/api/coffees";
+  return useSWR(url, fetcher);
 }
 
 export function useDoseTypes() {
@@ -64,8 +66,9 @@ export function useCoffeeTimeline(coffeeId: string | null) {
   return useSWR(coffeeId ? `/api/coffees/${coffeeId}/timeline` : null, fetcher);
 }
 
-export function useHomeData() {
-  return useSWR("/api/home", fetcher);
+export function useHomeData(cellarId?: string | null) {
+  const url = cellarId ? `/api/home?cellarId=${cellarId}` : "/api/home";
+  return useSWR(url, fetcher);
 }
 
 export function useCellars() {
@@ -76,8 +79,17 @@ export function useCellarInvites(cellarId: string | null) {
   return useSWR(cellarId ? `/api/cellars/${cellarId}/invites` : null, fetcher);
 }
 
-export function useBrewLogs(limit?: number) {
-  const url = limit ? `/api/brew?limit=${limit}` : "/api/brew";
+export function useBrewLogs(cellarId?: string | null, limit?: number) {
+  let url = "/api/brew";
+  const params = new URLSearchParams();
+  if (cellarId) params.set("cellarId", cellarId);
+  if (limit) params.set("limit", limit.toString());
+  if (params.toString()) url += `?${params.toString()}`;
+  return useSWR(url, fetcher);
+}
+
+export function useBrewStats(cellarId?: string | null) {
+  const url = cellarId ? `/api/brew/stats?cellarId=${cellarId}` : "/api/brew/stats";
   return useSWR(url, fetcher);
 }
 

@@ -1,17 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import useSWR from "swr";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, Coffee, Zap, ThumbsUp, Turtle } from "lucide-react";
+import { Clock, Zap, ThumbsUp, Turtle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BrewLog } from "@/lib/types";
-
-const fetcher = (url: string) => fetch(url).then(r => r.json());
+import { useBrewLogs, useBrewStats } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 
 function FeedbackIcon({ feedback }: { feedback: string }) {
   const config = {
@@ -30,11 +29,9 @@ interface GroupedBrews {
 }
 
 export default function HistoryPage() {
-  const { data: brewLogs, isLoading } = useSWR<BrewLog[]>("/api/brew?limit=100", fetcher);
-  const { data: stats } = useSWR<{ weekCups: number; weekGrams: number; monthCups: number; monthGrams: number; allTimeCups: number }>(
-    "/api/brew/stats",
-    fetcher
-  );
+  const { currentCellar } = useCellarContext();
+  const { data: brewLogs, isLoading } = useBrewLogs(currentCellar?.id, 100);
+  const { data: stats } = useBrewStats(currentCellar?.id);
 
   // Group brews by month
   const groupedBrews = useMemo(() => {

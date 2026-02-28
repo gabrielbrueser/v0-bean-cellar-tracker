@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { mutate } from "swr";
 import { toast } from "sonner";
 import { useCoffees, useDoseTypes, useAllVials } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +56,8 @@ interface EmptyDose {
 
 export default function SealCoffeePage() {
   const router = useRouter();
-  const { data: coffees, isLoading: coffeesLoading } = useCoffees();
+  const { currentCellar } = useCellarContext();
+  const { data: coffees, isLoading: coffeesLoading } = useCoffees(currentCellar?.id);
   const { data: doseTypes, isLoading: doseTypesLoading } = useDoseTypes();
   const { data: allVials, isLoading: vialsLoading } = useAllVials("EMPTY");
 
@@ -159,11 +161,13 @@ export default function SealCoffeePage() {
     setSealedCount(successCount);
     setFailedIds(failed);
 
-    // Refresh data
-    mutate("/api/inventory");
+    // Refresh data (cellar-scoped)
+    const cellarParam = currentCellar?.id ? `?cellarId=${currentCellar.id}` : "";
+    mutate(`/api/inventory${cellarParam}`);
     mutate("/api/vials/all");
     mutate("/api/vials");
-    mutate("/api/home");
+    mutate(`/api/home${cellarParam}`);
+    mutate(`/api/coffees${cellarParam}`);
 
     if (failed.length > 0) {
       toast.error(`Failed to seal: ${failed.join(", ")}`);

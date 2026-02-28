@@ -33,6 +33,7 @@ import { StarRating } from "@/components/star-rating";
 import { Coffee, Plus, MoreVertical, Archive, ArchiveRestore, ChevronDown, Search, Filter, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { useCellarContext } from "@/lib/cellar-context";
 
 // Color mapping for coffee tags
 const COLOR_CLASSES: Record<string, string> = {
@@ -63,7 +64,8 @@ interface CoffeeItem {
 }
 
 export default function CoffeesPage() {
-  const { data: coffees, isLoading, mutate: mutateCoffees } = useCoffees();
+  const { currentCellar } = useCellarContext();
+  const { data: coffees, isLoading, mutate: mutateCoffees } = useCoffees(currentCellar?.id);
   const { data: processMethods } = useProcessMethods();
   const { data: doseTypes } = useDoseTypes();
   

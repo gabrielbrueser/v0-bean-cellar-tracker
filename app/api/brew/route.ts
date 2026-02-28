@@ -108,9 +108,37 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const limit = parseInt(searchParams.get("limit") || "50");
+  const cellarId = searchParams.get("cellarId");
   const sql = getDb();
 
-  const rows = await sql`
+  const rows = cellarId ? await sql`
+    SELECT
+      bl.id,
+      bl.user_id,
+      bl.cellar_id,
+      bl.coffee_id,
+      bl.dose_id,
+      bl.brew_method,
+      bl.dose_grams,
+      bl.grind_size,
+      bl.grind_unit,
+      bl.extraction_grams,
+      bl.brew_feedback,
+      bl.notes,
+      bl.created_at,
+      c.coffee_name,
+      c.roaster,
+      v.vial_code,
+      u.name as user_name,
+      u.email as user_email
+    FROM brew_logs bl
+    JOIN coffees c ON c.id = bl.coffee_id
+    JOIN vials v ON v.id = bl.dose_id
+    LEFT JOIN users u ON u.id = bl.user_id
+    WHERE bl.cellar_id = ${cellarId}
+    ORDER BY bl.created_at DESC
+    LIMIT ${limit}
+  ` : await sql`
     SELECT
       bl.id,
       bl.user_id,

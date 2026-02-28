@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useHomeData } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import { QRScanner } from "@/components/qr-scanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,7 +79,8 @@ function DynamicSubtitle({ peakCount, frozenCount, lastBrewTime }: {
 export default function HomePage() {
   const router = useRouter();
   const [showScanner, setShowScanner] = useState(false);
-  const { data, isLoading } = useHomeData();
+  const { currentCellar } = useCellarContext();
+  const { data, isLoading } = useHomeData(currentCellar?.id);
 
   const handleScan = useCallback(
     async (value: string) => {
