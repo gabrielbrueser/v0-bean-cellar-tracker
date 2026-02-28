@@ -175,10 +175,12 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
         onSave(updated);
         toast.success("Coffee updated");
       } else {
-        const res = await fetch("/api/coffees", {
+        // POST to same URL as GET for proper SWR cache invalidation
+        const apiUrl = `/api/coffees?cellarId=${currentCellar.id}`;
+        const res = await fetch(apiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...form, cellarId: currentCellar.id }),
+          body: JSON.stringify(form),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -188,8 +190,8 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
         if (!created.id) {
           throw new Error("Coffee created but no ID returned");
         }
-        // Mutate the correct SWR key to refresh the list
-        mutate(`/api/coffees?cellarId=${currentCellar.id}`);
+        // Mutate the exact same SWR key to refresh the list
+        await mutate(apiUrl);
         onSave(created);
         toast.success("Coffee created");
       }
