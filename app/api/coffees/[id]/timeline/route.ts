@@ -19,7 +19,7 @@ export async function GET(
 
   // Verify coffee belongs to this cellar
   const coffeeCheck = await sql`
-    SELECT id FROM coffees WHERE id = ${coffeeId} AND cellar_id = ${cellarId}
+    SELECT id FROM coffees WHERE id = ${coffeeId}::uuid AND cellar_id = ${cellarId}::uuid
   `;
   if (coffeeCheck.length === 0) {
     return NextResponse.json(
