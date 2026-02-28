@@ -107,15 +107,18 @@ const GRIND_SCALES = {
 
   export function VialDetail({ vialId }: VialDetailProps) {
   const { currentCellar } = useCellarContext();
-  const { data: vial, isLoading: vialLoading } = useVial(vialId);
-  const { data: activeFill } = useActiveFillSession(vialId);
-  const { data: fillSessions } = useFillSessions(vialId);
-  const { data: coffee } = useCoffee(activeFill?.coffeeId ?? null);
+  const cellarId = currentCellar?.id;
+  
+  // All hooks now require cellarId for proper scoping
+  const { data: vial, isLoading: vialLoading } = useVial(vialId, cellarId);
+  const { data: activeFill } = useActiveFillSession(vialId, cellarId);
+  const { data: fillSessions } = useFillSessions(vialId, cellarId);
+  const { data: coffee } = useCoffee(activeFill?.coffeeId ?? null, cellarId);
   const { data: doseTypes } = useDoseTypes();
-  const { data: allCoffees } = useCoffees(currentCellar?.id);
+  const { data: allCoffees } = useCoffees(cellarId);
   
   // Helper to get cellar-scoped API URLs
-  const cellarParam = currentCellar?.id ? `?cellarId=${currentCellar.id}` : "";
+  const cellarParam = cellarId ? `?cellarId=${cellarId}` : "";
   
   const [showFillDialog, setShowFillDialog] = useState(false);
   const [showBrewDialog, setShowBrewDialog] = useState(false);
@@ -137,7 +140,7 @@ const GRIND_SCALES = {
   const [notes, setNotes] = useState("");
 
   // Get last grind settings for this coffee + method
-  const { data: lastGrind } = useLastGrindSettings(coffee?.id ?? null, brewMethod);
+  const { data: lastGrind } = useLastGrindSettings(coffee?.id ?? null, brewMethod, cellarId);
 
   const doseType = doseTypes?.find((dt: { id: string }) => dt.id === vial?.doseTypeId);
   const doseGrams = activeFill?.gramsPerDose ?? doseType?.gramsPerDose ?? 18;
@@ -207,10 +210,9 @@ const GRIND_SCALES = {
       toast.success("Dose updated");
       setShowEditDialog(false);
       
-      // Refresh data
-      mutate(`/api/vials/${vialId}`);
-      mutate(`/api/vials/${vialId}/fill-sessions`);
-      mutate(`/api/vials/${vialId}/active-fill`);
+      // Refresh data with correct scoped keys
+      mutate(`/api/vials/${vialId}${cellarParam}`);
+      mutate(`/api/vials/${vialId}/fill-sessions${cellarParam}`);
       mutate(`/api/inventory${cellarParam}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update dose");
@@ -232,7 +234,7 @@ const GRIND_SCALES = {
       if (!res.ok) throw new Error("Failed to toggle freeze");
       const data = await res.json();
       toast.success(data.isFrozen ? "Dose frozen" : "Dose unfrozen");
-      mutate(`/api/vials/${vialId}`);
+      mutate(`/api/vials/${vialId}${cellarParam}`);
       mutate(`/api/home${cellarParam}`);
       mutate(`/api/inventory${cellarParam}`);
     } catch {
@@ -278,12 +280,12 @@ const GRIND_SCALES = {
       setShowBrewDialog(false);
       setShowConfirmation(true);
       
-      // Refresh all relevant data
-      mutate(`/api/vials/${vialId}`);
-      mutate(`/api/vials/${vialId}/fill-sessions`);
+  // Refresh all relevant data with correct scoped keys
+      mutate(`/api/vials/${vialId}${cellarParam}`);
+      mutate(`/api/vials/${vialId}/fill-sessions${cellarParam}`);
       mutate(`/api/inventory${cellarParam}`);
       mutate(`/api/vials${cellarParam}`);
-mutate(`/api/brew${cellarParam}`);
+      mutate(`/api/brew${cellarParam}`);
   mutate(`/api/brew/stats${cellarParam}`);
   mutate(`/api/home${cellarParam}`);
       

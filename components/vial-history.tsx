@@ -2,6 +2,7 @@
 
 import { format } from "date-fns";
 import { useCoffee } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import type { FillSession } from "@/lib/types";
 import { Package, Coffee as CoffeeIcon, Snowflake, Sun } from "lucide-react";
 
@@ -14,7 +15,8 @@ interface LifecycleEvent {
 }
 
 function LifecycleTimeline({ session }: { session: FillSession }) {
-  const { data: coffee } = useCoffee(session.coffeeId);
+  const { currentCellar } = useCellarContext();
+  const { data: coffee } = useCoffee(session.coffeeId, currentCellar?.id);
   
   // Build lifecycle events
   const events: LifecycleEvent[] = [];
@@ -73,7 +75,8 @@ function LifecycleTimeline({ session }: { session: FillSession }) {
 }
 
 function HistoryItem({ session }: { session: FillSession }) {
-  const { data: coffee } = useCoffee(session.coffeeId);
+  const { currentCellar } = useCellarContext();
+  const { data: coffee } = useCoffee(session.coffeeId, currentCellar?.id);
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">

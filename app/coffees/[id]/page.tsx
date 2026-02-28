@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { useCoffee, useProcessMethods, useCoffeeTimeline } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,9 +34,13 @@ export default function CoffeeDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { data: coffee, isLoading, mutate } = useCoffee(id);
+  const { currentCellar } = useCellarContext();
+  const cellarId = currentCellar?.id;
+  const cellarParam = cellarId ? `?cellarId=${cellarId}` : "";
+  
+  const { data: coffee, isLoading, mutate } = useCoffee(id, cellarId);
   const { data: processMethods } = useProcessMethods();
-  const { data: timeline } = useCoffeeTimeline(id);
+  const { data: timeline } = useCoffeeTimeline(id, cellarId);
   const [showEdit, setShowEdit] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
 
@@ -43,15 +48,15 @@ export default function CoffeeDetailPage({
     processMethods?.find((pm) => pm.id === coffee?.processMethodId)?.name ?? "";
 
   const handleRatingChange = async (newRating: number) => {
-    if (!coffee) return;
+    if (!coffee || !cellarId) return;
     try {
-      await fetch(`/api/coffees/${id}`, {
+      await fetch(`/api/coffees/${id}${cellarParam}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...coffee, score: newRating }),
       });
-      mutate(`/api/coffees/${id}`);
-      mutate("coffees");
+      mutate(`/api/coffees/${id}${cellarParam}`);
+      mutate(`/api/coffees${cellarParam}`);
       toast.success(`Rated ${newRating} stars`);
     } catch {
       toast.error("Failed to update rating");

@@ -1,8 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { fetcher } from "./fetcher";
 
 export function useInventory(cellarId?: string | null) {
   // Use null key when no cellarId - SWR won't fetch until cellarId is available
@@ -30,15 +29,15 @@ export function useProcessMethods() {
   return useSWR("/api/process-methods", fetcher);
 }
 
-export function useVial(id: string | null) {
-  return useSWR(id ? `/api/vials/${id}` : null, fetcher);
+export function useVial(id: string | null, cellarId?: string | null) {
+  // Include cellarId for scoped fetch
+  const url = id && cellarId ? `/api/vials/${id}?cellarId=${cellarId}` : null;
+  return useSWR(url, fetcher);
 }
 
-export function useActiveFillSession(vialId: string | null) {
-  const { data: sessions, ...rest } = useSWR(
-    vialId ? `/api/vials/${vialId}/fill-sessions` : null,
-    fetcher
-  );
+export function useActiveFillSession(vialId: string | null, cellarId?: string | null) {
+  const url = vialId && cellarId ? `/api/vials/${vialId}/fill-sessions?cellarId=${cellarId}` : null;
+  const { data: sessions, ...rest } = useSWR(url, fetcher);
   // The active fill is the first one with status FULL
   const activeFill = sessions?.find(
     (s: { status: string }) => s.status === "FULL"
@@ -46,19 +45,20 @@ export function useActiveFillSession(vialId: string | null) {
   return { data: activeFill ?? null, ...rest };
 }
 
-export function useFillSessions(vialId: string | null) {
-  return useSWR(
-    vialId ? `/api/vials/${vialId}/fill-sessions` : null,
-    fetcher
-  );
+export function useFillSessions(vialId: string | null, cellarId?: string | null) {
+  const url = vialId && cellarId ? `/api/vials/${vialId}/fill-sessions?cellarId=${cellarId}` : null;
+  return useSWR(url, fetcher);
 }
 
-export function useCoffee(id: string | null) {
-  return useSWR(id ? `/api/coffees/${id}` : null, fetcher);
+export function useCoffee(id: string | null, cellarId?: string | null) {
+  const url = id && cellarId ? `/api/coffees/${id}?cellarId=${cellarId}` : null;
+  return useSWR(url, fetcher);
 }
 
-export function useActivity() {
-  return useSWR("/api/activity", fetcher);
+export function useActivity(cellarId?: string | null) {
+  // Scoped to cellar
+  const url = cellarId ? `/api/activity?cellarId=${cellarId}` : null;
+  return useSWR(url, fetcher);
 }
 
 export function useAllVials(cellarId?: string | null, status?: "FULL" | "EMPTY" | null) {
@@ -71,8 +71,9 @@ export function useAllVials(cellarId?: string | null, status?: "FULL" | "EMPTY" 
   return useSWR(url, fetcher);
 }
 
-export function useCoffeeTimeline(coffeeId: string | null) {
-  return useSWR(coffeeId ? `/api/coffees/${coffeeId}/timeline` : null, fetcher);
+export function useCoffeeTimeline(coffeeId: string | null, cellarId?: string | null) {
+  const url = coffeeId && cellarId ? `/api/coffees/${coffeeId}/timeline?cellarId=${cellarId}` : null;
+  return useSWR(url, fetcher);
 }
 
 export function useHomeData(cellarId?: string | null) {
@@ -105,9 +106,9 @@ export function useBrewStats(cellarId?: string | null) {
   return useSWR(url, fetcher);
 }
 
-export function useLastGrindSettings(coffeeId: string | null, brewMethod: string | null) {
-  return useSWR(
-    coffeeId && brewMethod ? `/api/brew/last-grind?coffeeId=${coffeeId}&brewMethod=${brewMethod}` : null,
-    fetcher
-  );
+export function useLastGrindSettings(coffeeId: string | null, brewMethod: string | null, cellarId?: string | null) {
+  const url = coffeeId && brewMethod && cellarId 
+    ? `/api/brew/last-grind?coffeeId=${coffeeId}&brewMethod=${brewMethod}&cellarId=${cellarId}` 
+    : null;
+  return useSWR(url, fetcher);
 }

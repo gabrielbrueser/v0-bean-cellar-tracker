@@ -73,9 +73,6 @@ export default function CoffeesPage() {
   // Combined loading state: loading if cellar is loading OR (we have a cellar but coffees are still loading)
   const isLoading = cellarLoading || (currentCellar?.id && coffeesLoading);
   
-  // Compute the actual SWR key being used
-  const swrKey = currentCellar?.id ? `/api/coffees?cellarId=${currentCellar.id}` : null;
-  
   const [showCreate, setShowCreate] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -153,18 +150,6 @@ export default function CoffeesPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
-      {/* DEV DEBUG PANEL - Remove after debugging */}
-      {process.env.NODE_ENV !== "production" && (
-        <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-xs font-mono">
-          <div className="font-bold text-yellow-800 mb-1">DEBUG (Coffees Page)</div>
-          <div>cellar.id: <span className="text-blue-600">{currentCellar?.id || "NULL"}</span></div>
-          <div>cellar.name: <span className="text-blue-600">{currentCellar?.name || "NULL"}</span></div>
-          <div>cellarLoading: <span className="text-blue-600">{String(cellarLoading)}</span></div>
-          <div>SWR key: <span className="text-blue-600">{swrKey || "NULL"}</span></div>
-          <div>coffees.length: <span className="text-blue-600">{coffees?.length ?? "undefined"}</span></div>
-          <div>coffeesLoading: <span className="text-blue-600">{String(coffeesLoading)}</span></div>
-        </div>
-      )}
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">

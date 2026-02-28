@@ -225,18 +225,6 @@ export default function InventoryPage() {
 
   return (
   <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
-  {/* DEV DEBUG PANEL - Remove after debugging */}
-  {process.env.NODE_ENV !== "production" && (
-    <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-xs font-mono">
-      <div className="font-bold text-yellow-800 mb-1">DEBUG (Inventory Page)</div>
-      <div>cellar.id: <span className="text-blue-600">{currentCellar?.id || "NULL"}</span></div>
-      <div>cellar.name: <span className="text-blue-600">{currentCellar?.name || "NULL"}</span></div>
-      <div>cellarLoading: <span className="text-blue-600">{String(cellarLoading)}</span></div>
-      <div>SWR key: <span className="text-blue-600">{inventoryUrl || "NULL"}</span></div>
-      <div>groups.length: <span className="text-blue-600">{groups?.length ?? "undefined"}</span></div>
-      <div>inventoryLoading: <span className="text-blue-600">{String(inventoryLoading)}</span></div>
-    </div>
-  )}
   {/* Header */}
   <header className="mb-4 flex items-start justify-between">
         <div>

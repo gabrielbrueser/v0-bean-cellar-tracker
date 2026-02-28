@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useActiveFillSession } from "./hooks";
 
 export function useVialAction(vialId: string, cellarId?: string | null) {
-  const { data: activeFill } = useActiveFillSession(vialId);
+  const { data: activeFill } = useActiveFillSession(vialId, cellarId);
   const [loading, setLoading] = useState(false);
   const cellarParam = cellarId ? `cellarId=${cellarId}` : "";
 
@@ -21,8 +21,8 @@ export function useVialAction(vialId: string, cellarId?: string | null) {
       const res = await fetch(`/api/vials/${vialId}/use?${cellarParam}`, { method: "POST" });
       if (!res.ok) throw new Error("Failed");
       toast.success("Coffee used!", { description: "Vial marked as empty." });
-      mutate(`/api/vials/${vialId}`);
-      mutate(`/api/vials/${vialId}/fill-sessions`);
+      mutate(`/api/vials/${vialId}?${cellarParam}`);
+      mutate(`/api/vials/${vialId}/fill-sessions?${cellarParam}`);
       mutate(`/api/inventory?${cellarParam}`);
       mutate(`/api/vials?${cellarParam}`);
     } catch {

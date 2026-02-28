@@ -1,10 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { requireCellarId } from "@/lib/api/cellar";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  let cellarId: string;
+  try {
+    cellarId = requireCellarId(req);
+  } catch (response) {
+    return response as NextResponse;
+  }
+  
   const sql = getDb();
 
-  // Get recent usage logs with coffee, vial, and user info
+  // Get recent usage logs scoped to this cellar via coffees.cellar_id
   const rows = await sql`
     SELECT
       ul.id,
@@ -26,6 +34,7 @@ export async function GET() {
     JOIN coffees c ON c.id = fs.coffee_id
     JOIN dose_types dt ON dt.id = fs.dose_type_id
     LEFT JOIN users u ON u.id = ul.created_by_user_id
+    WHERE c.cellar_id = ${cellarId}
     ORDER BY ul.timestamp DESC
     LIMIT 50
   `;
@@ -45,5 +54,7 @@ export async function GET() {
     userName: r.user_name || r.user_email?.split("@")[0] || null,
   }));
 
-  return NextResponse.json(activities);
+  return NextResponse.json(activities, {
+    headers: { "Cache-Control": "no-store, max-age=0" },
+  });
 }
