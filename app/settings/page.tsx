@@ -35,7 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Coffee, Clock, Beaker, Trash2, TestTube, Settings2, Pencil, AlertTriangle, Printer, LogOut, User, Users, UserPlus, Zap, ThumbsUp, Turtle } from "lucide-react";
+import { Coffee, Clock, Beaker, Trash2, TestTube, Settings2, Pencil, AlertTriangle, Printer, LogOut, User, Users, UserPlus, Zap, ThumbsUp, Turtle, Plus, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { CellarSwitcher } from "@/components/cellar-switcher";
 import { formatDistanceToNow, startOfWeek, isAfter } from "date-fns";
@@ -84,6 +84,9 @@ export default function SettingsPage() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [brewLogToDelete, setBrewLogToDelete] = useState<BrewLog | null>(null);
   const [isDeletingBrewLog, setIsDeletingBrewLog] = useState(false);
+  const [showCreateDose, setShowCreateDose] = useState(false);
+  const [isCreatingDose, setIsCreatingDose] = useState(false);
+  const [createdDose, setCreatedDose] = useState<{ id: string; code: string } | null>(null);
 
   // Calculate statistics from brew_logs
   const stats = {
@@ -136,6 +139,30 @@ export default function SettingsPage() {
       toast.error("Failed to delete brew log");
     } finally {
       setIsDeletingBrewLog(false);
+    }
+  };
+
+  const handleCreateDose = async (doseTypeId: string) => {
+    setIsCreatingDose(true);
+    try {
+      const res = await fetch("/api/vials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doseTypeId }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Server error" }));
+        throw new Error(errorData.error || "Couldn't create dose. Please try again.");
+      }
+      const dose = await res.json();
+      setCreatedDose({ id: dose.id, code: dose.vialCode });
+      mutate("/api/vials/all");
+      mutate("/api/inventory");
+      toast.success(`Dose ${dose.vialCode} created!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't create dose. Please try again.");
+    } finally {
+      setIsCreatingDose(false);
     }
   };
 
@@ -254,20 +281,27 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <TestTube className="size-4" />
-            Dose Management
+            Manage Doses
           </CardTitle>
           <CardDescription>
-            View, rename, and delete your doses
+            Create, view, rename, and delete your doses
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
+          <Button
+            className="w-full"
+            onClick={() => setShowCreateDose(true)}
+          >
+            <Plus className="size-4 mr-2" />
+            Create New Dose
+          </Button>
           <Button
             variant="outline"
             className="w-full"
             onClick={() => setShowVialManager(true)}
           >
             <Settings2 className="size-4 mr-2" />
-            Manage Doses ({vials?.length ?? 0})
+            View All Doses ({vials?.length ?? 0})
           </Button>
           <Link href="/print-labels">
             <Button variant="outline" className="w-full">
@@ -571,6 +605,81 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create New Dose Dialog */}
+      <Dialog open={showCreateDose} onOpenChange={(open) => {
+        setShowCreateDose(open);
+        if (!open) setCreatedDose(null);
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Create New Dose</DialogTitle>
+            <DialogDescription>
+              {createdDose 
+                ? "Your new dose is ready! Print the label and attach it to your container."
+                : "Choose a dose type to create a new empty dose with a permanent QR code."
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          {createdDose ? (
+            <div className="py-4">
+              <div className="flex flex-col items-center gap-4">
+                <div className="size-16 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle2 className="size-8 text-green-600" />
+                </div>
+                <p className="text-2xl font-bold font-mono text-foreground">
+                  {createdDose.code}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 mt-6">
+                <Link href={`/vials/${createdDose.id}/label`}>
+                  <Button className="w-full gap-2">
+                    <Printer className="size-4" />
+                    Print Label
+                  </Button>
+                </Link>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setCreatedDose(null)}
+                >
+                  Create Another
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-4 flex flex-col gap-3">
+              {doseTypes?.map((dt) => (
+                <button
+                  key={dt.id}
+                  onClick={() => handleCreateDose(dt.id)}
+                  disabled={isCreatingDose}
+                  className="group flex w-full items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-all hover:bg-secondary/50 hover:border-primary/30 disabled:opacity-50"
+                >
+                  <div className="flex size-12 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                    <Beaker className="size-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-foreground">
+                      {dt.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {dt.gramsPerDose}g per dose · <span className="font-mono">{dt.prefix}-###</span>
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowCreateDose(false); setCreatedDose(null); }}>
+              {createdDose ? "Done" : "Cancel"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

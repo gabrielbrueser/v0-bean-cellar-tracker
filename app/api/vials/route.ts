@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { randomUUID } from "crypto";
 
-// GET /api/vials — list all vials
+// GET /api/vials — list all doses
 export async function GET() {
   const sql = getDb();
   const rows = await sql`
@@ -24,18 +25,10 @@ export async function GET() {
 }
 
 /**
- * Generate the next available label for a given prefix using gap-filling.
- * This ensures labels are always sequential and reuses deleted label numbers.
- * 
- * Algorithm:
- * 1. Get all existing label numbers for this prefix
- * 2. Find the lowest missing positive integer (gap)
- * 3. If no gap exists, use max + 1
- * 4. Return the formatted label code (e.g., ESP-004)
+ * Compute the lowest available label number for a given prefix.
+ * Returns the smallest positive integer not currently in use.
  */
-async function getNextAvailableLabelNumber(sql: ReturnType<typeof getDb>, prefix: string): Promise<number> {
-  // Get all existing label numbers for this prefix
-  // Extract the numeric part from vial_code like "ESP-001" -> 1
+async function computeLowestAvailableNumber(sql: ReturnType<typeof getDb>, prefix: string): Promise<number> {
   const existingRows = await sql`
     SELECT 
       CAST(SUBSTRING(vial_code FROM '[0-9]+$') AS INTEGER) as label_num
@@ -55,8 +48,18 @@ async function getNextAvailableLabelNumber(sql: ReturnType<typeof getDb>, prefix
   return nextNum;
 }
 
-// POST /api/vials — create a new vial
+/**
+ * Create a new empty dose using non-transactional approach.
+ * Uses retry-on-conflict for concurrency safety.
+ * 
+ * Algorithm:
+ * 1. Compute candidate number (lowest available)
+ * 2. Attempt INSERT with that number
+ * 3. If unique constraint violation, recompute and retry (max 5 tries)
+ */
 export async function POST(req: NextRequest) {
+  const MAX_RETRIES = 5;
+  
   try {
     const body = await req.json();
     const { doseTypeId } = body;
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!process.env.DATABASE_URL) {
-      console.error("[v0] DATABASE_URL not configured");
+      console.error("[DOSE_CREATE] DATABASE_URL not configured");
       return NextResponse.json({ error: "Database not configured" }, { status: 500 });
     }
 
@@ -79,44 +82,65 @@ export async function POST(req: NextRequest) {
     }
     const prefix = dts[0].prefix;
 
-    // Use advisory lock to prevent concurrent label assignment collision
-    // Lock key is based on prefix hash to ensure different prefixes don't block each other
-    const lockKey = prefix.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    
-    // Acquire lock, get next number, create vial, release lock - all in one transaction
-    const rows = await sql.begin(async (tx) => {
-      // Acquire advisory lock for this prefix
-      await tx`SELECT pg_advisory_xact_lock(${lockKey})`;
-      
-      // Get next available label number (gap-filling)
-      const seq = await getNextAvailableLabelNumber(tx, prefix);
-      
-      const vialCode = `${prefix}-${String(seq).padStart(3, "0")}`;
-      const qrValue = `bc:${vialCode}`;
+    // Retry loop for concurrency safety
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        // Compute lowest available number
+        const seq = await computeLowestAvailableNumber(sql, prefix);
+        const doseCode = `${prefix}-${String(seq).padStart(3, "0")}`;
+        const qrValue = doseCode; // QR encodes just the dose code
+        const id = randomUUID();
 
-      const result = await tx`
-        INSERT INTO vials (dose_type_id, vial_code, qr_value, status)
-        VALUES (${doseTypeId}, ${vialCode}, ${qrValue}, 'EMPTY')
-        RETURNING *
-      `;
-      
-      return result;
-    });
+        // Attempt insert - will fail with unique constraint if another request got there first
+        const rows = await sql`
+          INSERT INTO vials (id, dose_type_id, vial_code, qr_value, status, is_frozen)
+          VALUES (${id}, ${doseTypeId}, ${doseCode}, ${qrValue}, 'EMPTY', false)
+          RETURNING *
+        `;
 
-    const r = rows[0];
-    return NextResponse.json({
-      id: r.id,
-      vialCode: r.vial_code,
-      doseTypeId: r.dose_type_id,
-      qrValue: r.qr_value,
-      createdAt: r.created_at,
-      status: r.status,
-    });
+        const r = rows[0];
+        console.log(`[DOSE_CREATE] Created dose ${doseCode} on attempt ${attempt}`);
+        
+        return NextResponse.json({
+          id: r.id,
+          vialCode: r.vial_code,
+          doseTypeId: r.dose_type_id,
+          qrValue: r.qr_value,
+          createdAt: r.created_at,
+          status: r.status,
+        });
+      } catch (insertError) {
+        const errorMessage = insertError instanceof Error ? insertError.message : String(insertError);
+        
+        // Check if it's a unique constraint violation (PostgreSQL error code 23505)
+        if (errorMessage.includes('23505') || errorMessage.includes('unique') || errorMessage.includes('duplicate')) {
+          console.log(`[DOSE_CREATE] Conflict on attempt ${attempt}, retrying...`);
+          if (attempt === MAX_RETRIES) {
+            console.error(`[DOSE_CREATE] Max retries exceeded`);
+            return NextResponse.json(
+              { error: "Couldn't create new dose. Please try again." },
+              { status: 409 }
+            );
+          }
+          // Continue to next attempt
+          continue;
+        }
+        
+        // Not a conflict error, rethrow
+        throw insertError;
+      }
+    }
+
+    // Should not reach here
+    return NextResponse.json(
+      { error: "Couldn't create new dose. Please try again." },
+      { status: 500 }
+    );
   } catch (error) {
-    console.error("[v0] Failed to create vial:", error);
+    console.error("[DOSE_CREATE] Failed to create dose:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: `Failed to create vial: ${message}` },
+      { error: `Couldn't create new dose. Please try again.` },
       { status: 500 }
     );
   }

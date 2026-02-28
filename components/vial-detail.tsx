@@ -435,6 +435,19 @@ export function VialDetail({ vialId }: VialDetailProps) {
             </DialogDescription>
           </DialogHeader>
           
+          {/* Selected Dose ID - Prominent Display */}
+          <div className="bg-primary/10 rounded-lg p-4 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Selected dose</p>
+            <p className="text-2xl font-bold font-mono text-primary">
+              {vial?.vialCode}
+            </p>
+            {coffee && (
+              <p className="text-sm text-foreground mt-1">
+                {coffee.coffeeName} · {doseGrams}g
+              </p>
+            )}
+          </div>
+          
           <div className="flex flex-col gap-5 py-4">
             {/* Brew Method - Required */}
             <div>
