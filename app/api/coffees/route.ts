@@ -5,7 +5,7 @@ import { requireCellarId } from "@/lib/api/cellar";
 export async function GET(req: NextRequest) {
   let cellarId: string;
   try {
-    // This uses your project's internal security check
+    // Correctly uses your internal security helper
     cellarId = requireCellarId(req);
   } catch (response) {
     return response as NextResponse;
@@ -14,15 +14,16 @@ export async function GET(req: NextRequest) {
   const sql = getDb();
 
   try {
-    // We add ::uuid to tell the database exactly what type of ID this is
+    // The ::uuid cast is critical to stop the 500 errors
     const rows = await sql`
       SELECT * FROM coffees 
       WHERE cellar_id = ${cellarId}::uuid 
+      AND deleted_at IS NULL
       ORDER BY created_at DESC
     `;
     return NextResponse.json(rows);
   } catch (error) {
-    console.error("Database Error:", error);
+    console.error("Coffee API Error:", error);
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 }

@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   const sql = getDb();
 
   try {
+    // Scoped query for vials (doses)
     const rows = await sql`
       SELECT * FROM vials 
       WHERE cellar_id = ${cellarId}::uuid
