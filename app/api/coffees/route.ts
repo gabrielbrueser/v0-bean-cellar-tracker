@@ -7,6 +7,9 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const cellarId = searchParams.get("cellarId");
   
+  // DEV LOG - remove later
+  console.log("[v0] GET /api/coffees - cellarId:", cellarId);
+  
   // Get coffees with last brewed date and total brews, filtered by cellar (exclude deleted brews)
   const rows = cellarId ? await sql`
     SELECT 
@@ -48,6 +51,10 @@ export async function GET(req: NextRequest) {
     totalBrews: r.total_brews || 0,
     lastRoastDate: r.last_roast_date,
   }));
+  
+  // DEV LOG - remove later
+  console.log("[v0] GET /api/coffees - resultCount:", coffees.length);
+  
   return NextResponse.json(coffees);
 }
 
@@ -55,15 +62,20 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const sql = getDb();
+  const { searchParams } = new URL(req.url);
   
-  // cellarId is REQUIRED - must be passed from client
-  const cellarId = body.cellarId;
+  // cellarId MUST come from query param to match GET endpoint for SWR cache
+  const cellarId = searchParams.get("cellarId");
   if (!cellarId) {
+    console.log("[v0] POST /api/coffees - ERROR: missing cellarId query param");
     return NextResponse.json(
-      { error: "cellarId is required to create a coffee" },
+      { error: "cellarId query param is required to create a coffee" },
       { status: 400 }
     );
   }
+  
+  // DEV LOG - remove later
+  console.log("[v0] POST /api/coffees - cellarId:", cellarId, "coffeeName:", body.coffeeName);
   
   const rows = await sql`
     INSERT INTO coffees (roaster, coffee_name, score, origin, producer, variety, altitude, tasting_notes, notes, link, process_method_id, color, cellar_id)
@@ -79,6 +91,10 @@ export async function POST(req: NextRequest) {
   }
   
   const r = rows[0];
+  
+  // DEV LOG - remove later
+  console.log("[v0] POST /api/coffees - created coffee id:", r.id, "cellar_id:", r.cellar_id);
+  
   return NextResponse.json({
     id: r.id,
     roaster: r.roaster,
