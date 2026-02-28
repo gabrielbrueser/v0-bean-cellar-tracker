@@ -64,10 +64,14 @@ interface CoffeeItem {
 }
 
 export default function CoffeesPage() {
-  const { currentCellar } = useCellarContext();
-  const { data: coffees, isLoading, mutate: mutateCoffees } = useCoffees(currentCellar?.id);
+  const { currentCellar, isLoading: cellarLoading } = useCellarContext();
+  // Only fetch coffees when we have a cellarId to prevent cache key mismatches
+  const { data: coffees, isLoading: coffeesLoading, mutate: mutateCoffees } = useCoffees(currentCellar?.id);
   const { data: processMethods } = useProcessMethods();
   const { data: doseTypes } = useDoseTypes();
+  
+  // Combined loading state: loading if cellar is loading OR (we have a cellar but coffees are still loading)
+  const isLoading = cellarLoading || (currentCellar?.id && coffeesLoading);
   
   const [showCreate, setShowCreate] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -394,7 +398,7 @@ export default function CoffeesPage() {
           <CoffeeForm
             onSave={() => {
               setShowCreate(false);
-              mutateCoffees();
+              // No need to call mutateCoffees() - CoffeeForm handles optimistic updates
             }}
             onCancel={() => setShowCreate(false)}
           />

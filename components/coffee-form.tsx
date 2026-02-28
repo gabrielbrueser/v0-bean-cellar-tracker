@@ -177,21 +177,61 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
       } else {
         // POST to same URL as GET for proper SWR cache invalidation
         const apiUrl = `/api/coffees?cellarId=${currentCellar.id}`;
+        
+        // Create optimistic coffee object with temporary ID
+        const optimisticCoffee = {
+          id: `temp-${Date.now()}`,
+          ...form,
+          archived: false,
+          createdAt: new Date().toISOString(),
+          cellarId: currentCellar.id,
+          totalBrews: 0,
+        };
+        
+        // Optimistic update: immediately add to cache
+        await mutate(
+          apiUrl,
+          async (currentData: unknown[] | undefined) => {
+            // Add optimistic coffee to the beginning of the list
+            return [optimisticCoffee, ...(currentData || [])];
+          },
+          { revalidate: false } // Don't revalidate yet
+        );
+        
         const res = await fetch(apiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
         });
+        
         if (!res.ok) {
+          // Rollback optimistic update on error
+          await mutate(apiUrl);
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || "Failed to create coffee");
         }
+        
         const created = await res.json();
         if (!created.id) {
+          // Rollback optimistic update on error
+          await mutate(apiUrl);
           throw new Error("Coffee created but no ID returned");
         }
-        // Mutate the exact same SWR key to refresh the list
-        await mutate(apiUrl);
+        
+        // Replace optimistic coffee with real one from server
+        await mutate(
+          apiUrl,
+          async (currentData: unknown[] | undefined) => {
+            if (!currentData) return [created];
+            // Replace the temp coffee with the real one
+            return currentData.map((c: unknown) => {
+              const coffee = c as { id: string };
+              return coffee.id === optimisticCoffee.id ? created : c;
+            });
+          },
+          { revalidate: true } // Now revalidate to ensure consistency
+        );
+        
         onSave(created);
         toast.success("Coffee created");
       }
