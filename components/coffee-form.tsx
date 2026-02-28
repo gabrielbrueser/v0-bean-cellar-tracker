@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useProcessMethods } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import type { Coffee } from "@/lib/types";
 import { LabelScanner } from "@/components/label-scanner";
 import { Camera } from "lucide-react";
@@ -26,6 +27,7 @@ interface CoffeeFormProps {
 }
 
 export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
+  const { currentCellar } = useCellarContext();
   const { data: processMethods, mutate: mutatePM } = useProcessMethods();
   const [loading, setLoading] = useState(false);
   const [showCustomProcess, setShowCustomProcess] = useState(false);
@@ -151,6 +153,10 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
       toast.error("Coffee name and origin are required");
       return;
     }
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
     setLoading(true);
     try {
       if (coffee) {
@@ -159,23 +165,36 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
         });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to update coffee");
+        }
         const updated = await res.json();
-        mutate("coffees");
+        // Mutate the correct SWR key
+        mutate(`/api/coffees?cellarId=${currentCellar.id}`);
         onSave(updated);
         toast.success("Coffee updated");
       } else {
         const res = await fetch("/api/coffees", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, cellarId: currentCellar.id }),
         });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to create coffee");
+        }
         const created = await res.json();
-        mutate("coffees");
+        if (!created.id) {
+          throw new Error("Coffee created but no ID returned");
+        }
+        // Mutate the correct SWR key to refresh the list
+        mutate(`/api/coffees?cellarId=${currentCellar.id}`);
         onSave(created);
         toast.success("Coffee created");
       }
-    } catch {
-      toast.error("Failed to save coffee");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save coffee");
     } finally {
       setLoading(false);
     }
