@@ -6,7 +6,15 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const cellarId = searchParams.get("cellarId");
 
-  const [weekStats, monthStats, allTimeStats] = cellarId ? await Promise.all([
+  // REQUIRE cellarId to prevent returning all data
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
+
+  const [weekStats, monthStats, allTimeStats] = await Promise.all([
     sql`
       SELECT 
         COUNT(*)::int as cups,
@@ -33,30 +41,6 @@ export async function GET(req: NextRequest) {
       WHERE cellar_id = ${cellarId}
         AND deleted_at IS NULL
     `,
-  ]) : await Promise.all([
-    sql`
-      SELECT 
-        COUNT(*)::int as cups,
-        COALESCE(SUM(dose_grams), 0)::numeric as grams
-      FROM brew_logs
-      WHERE created_at > NOW() - INTERVAL '7 days'
-        AND deleted_at IS NULL
-    `,
-    sql`
-      SELECT 
-        COUNT(*)::int as cups,
-        COALESCE(SUM(dose_grams), 0)::numeric as grams
-      FROM brew_logs
-      WHERE created_at >= DATE_TRUNC('month', NOW())
-        AND deleted_at IS NULL
-    `,
-    sql`
-      SELECT 
-        COUNT(*)::int as cups,
-        COALESCE(SUM(dose_grams), 0)::numeric as grams
-      FROM brew_logs
-      WHERE deleted_at IS NULL
-    `,
   ]);
 
   return NextResponse.json({
@@ -66,5 +50,9 @@ export async function GET(req: NextRequest) {
     monthGrams: Math.round(parseFloat(monthStats[0]?.grams) || 0),
     allTimeCups: allTimeStats[0]?.cups || 0,
     allTimeGrams: Math.round(parseFloat(allTimeStats[0]?.grams) || 0),
+  }, {
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+    },
   });
 }

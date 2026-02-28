@@ -5,7 +5,8 @@ import useSWR from "swr";
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function useInventory(cellarId?: string | null) {
-  const url = cellarId ? `/api/inventory?cellarId=${cellarId}` : "/api/inventory";
+  // Use null key when no cellarId - SWR won't fetch until cellarId is available
+  const url = cellarId ? `/api/inventory?cellarId=${cellarId}` : null;
   return useSWR(url, fetcher);
 }
 
@@ -14,7 +15,8 @@ export function useVials() {
 }
 
 export function useCoffees(cellarId?: string | null) {
-  const url = cellarId ? `/api/coffees?cellarId=${cellarId}` : "/api/coffees";
+  // Use null key when no cellarId - SWR won't fetch until cellarId is available
+  const url = cellarId ? `/api/coffees?cellarId=${cellarId}` : null;
   return useSWR(url, fetcher);
 }
 
@@ -67,7 +69,8 @@ export function useCoffeeTimeline(coffeeId: string | null) {
 }
 
 export function useHomeData(cellarId?: string | null) {
-  const url = cellarId ? `/api/home?cellarId=${cellarId}` : "/api/home";
+  // Use null key when no cellarId - SWR won't fetch until cellarId is available
+  const url = cellarId ? `/api/home?cellarId=${cellarId}` : null;
   return useSWR(url, fetcher);
 }
 
@@ -80,16 +83,18 @@ export function useCellarInvites(cellarId: string | null) {
 }
 
 export function useBrewLogs(cellarId?: string | null, limit?: number) {
-  let url = "/api/brew";
+  // Use null key when no cellarId - SWR won't fetch until cellarId is available
+  if (!cellarId) return useSWR(null, fetcher);
   const params = new URLSearchParams();
-  if (cellarId) params.set("cellarId", cellarId);
+  params.set("cellarId", cellarId);
   if (limit) params.set("limit", limit.toString());
-  if (params.toString()) url += `?${params.toString()}`;
+  const url = `/api/brew?${params.toString()}`;
   return useSWR(url, fetcher);
 }
 
 export function useBrewStats(cellarId?: string | null) {
-  const url = cellarId ? `/api/brew/stats?cellarId=${cellarId}` : "/api/brew/stats";
+  // Use null key when no cellarId - SWR won't fetch until cellarId is available
+  const url = cellarId ? `/api/brew/stats?cellarId=${cellarId}` : null;
   return useSWR(url, fetcher);
 }
 
