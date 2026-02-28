@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       (SELECT COUNT(*)::int FROM brew_logs bl WHERE bl.coffee_id = c.id AND bl.deleted_at IS NULL) as total_brews,
       (SELECT fs.roast_date FROM fill_sessions fs WHERE fs.coffee_id = c.id ORDER BY fs.created_at DESC LIMIT 1) as last_roast_date
     FROM coffees c
-    WHERE c.cellar_id = ${cellarId}
+    WHERE c.cellar_id = ${cellarId}::uuid
     ORDER BY c.created_at DESC
   `;
   
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   
   const rows = await sql`
     INSERT INTO coffees (roaster, coffee_name, score, origin, producer, variety, altitude, tasting_notes, notes, link, process_method_id, color, cellar_id)
-    VALUES (${body.roaster || "Tanat"}, ${body.coffeeName}, ${body.score || 0}, ${body.origin}, ${body.producer || ""}, ${body.variety || ""}, ${body.altitude || ""}, ${body.tastingNotes || ""}, ${body.notes || ""}, ${body.link || ""}, ${body.processMethodId || null}, ${body.color || null}, ${cellarId})
+    VALUES (${body.roaster || "Tanat"}, ${body.coffeeName}, ${body.score || 0}, ${body.origin}, ${body.producer || ""}, ${body.variety || ""}, ${body.altitude || ""}, ${body.tastingNotes || ""}, ${body.notes || ""}, ${body.link || ""}, ${body.processMethodId || null}, ${body.color || null}, ${cellarId}::uuid)
     RETURNING *
   `;
   
