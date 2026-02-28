@@ -12,14 +12,18 @@ export async function GET(req: NextRequest) {
         COUNT(*)::int as cups,
         COALESCE(SUM(dose_grams), 0)::numeric as grams
       FROM brew_logs
-      WHERE created_at > NOW() - INTERVAL '7 days' AND cellar_id = ${cellarId}
+      WHERE created_at > NOW() - INTERVAL '7 days' 
+        AND cellar_id = ${cellarId}
+        AND deleted_at IS NULL
     `,
     sql`
       SELECT 
         COUNT(*)::int as cups,
         COALESCE(SUM(dose_grams), 0)::numeric as grams
       FROM brew_logs
-      WHERE created_at >= DATE_TRUNC('month', NOW()) AND cellar_id = ${cellarId}
+      WHERE created_at >= DATE_TRUNC('month', NOW()) 
+        AND cellar_id = ${cellarId}
+        AND deleted_at IS NULL
     `,
     sql`
       SELECT 
@@ -27,6 +31,7 @@ export async function GET(req: NextRequest) {
         COALESCE(SUM(dose_grams), 0)::numeric as grams
       FROM brew_logs
       WHERE cellar_id = ${cellarId}
+        AND deleted_at IS NULL
     `,
   ]) : await Promise.all([
     sql`
@@ -35,6 +40,7 @@ export async function GET(req: NextRequest) {
         COALESCE(SUM(dose_grams), 0)::numeric as grams
       FROM brew_logs
       WHERE created_at > NOW() - INTERVAL '7 days'
+        AND deleted_at IS NULL
     `,
     sql`
       SELECT 
@@ -42,12 +48,14 @@ export async function GET(req: NextRequest) {
         COALESCE(SUM(dose_grams), 0)::numeric as grams
       FROM brew_logs
       WHERE created_at >= DATE_TRUNC('month', NOW())
+        AND deleted_at IS NULL
     `,
     sql`
       SELECT 
         COUNT(*)::int as cups,
         COALESCE(SUM(dose_grams), 0)::numeric as grams
       FROM brew_logs
+      WHERE deleted_at IS NULL
     `,
   ]);
 

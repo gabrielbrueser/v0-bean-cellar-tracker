@@ -11,7 +11,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QrCode, Package, Coffee, ChevronRight, Sparkles, Leaf, Snowflake, Zap, ThumbsUp, Turtle } from "lucide-react";
+import { QrCode, Package, Coffee, ChevronRight, Sparkles, Leaf, Snowflake, Zap, ThumbsUp, Turtle, AlertTriangle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { mutate } from "swr";
 
 // Strict time windows for greeting
 function getGreeting() {
@@ -79,8 +81,45 @@ function DynamicSubtitle({ peakCount, frozenCount, lastBrewTime }: {
 export default function HomePage() {
   const router = useRouter();
   const [showScanner, setShowScanner] = useState(false);
+  const [showFreezeConfirm, setShowFreezeConfirm] = useState(false);
+  const [isFreezing, setIsFreezing] = useState(false);
   const { currentCellar } = useCellarContext();
-  const { data, isLoading } = useHomeData(currentCellar?.id);
+  const { data, isLoading, mutate: mutateHome } = useHomeData(currentCellar?.id);
+
+  const handleFreezeAll = async () => {
+    if (!data?.staleSoonDoseIds?.length || !currentCellar?.id) return;
+    
+    setIsFreezing(true);
+    try {
+      const res = await fetch("/api/dose/freezeMany", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doseIds: data.staleSoonDoseIds,
+          cellarId: currentCellar.id,
+        }),
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to freeze doses");
+      }
+      
+      const result = await res.json();
+      toast.success(`Froze ${result.frozenCount} dose${result.frozenCount !== 1 ? 's' : ''}`);
+      
+      // Refresh home data
+      mutateHome();
+      const cellarParam = `?cellarId=${currentCellar.id}`;
+      mutate(`/api/inventory${cellarParam}`);
+      
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to freeze doses");
+    } finally {
+      setIsFreezing(false);
+      setShowFreezeConfirm(false);
+    }
+  };
 
   const handleScan = useCallback(
     async (value: string) => {
@@ -223,6 +262,44 @@ export default function HomePage() {
         )}
       </section>
 
+      {/* Freeze Reminder - About to go stale warning */}
+      {!isLoading && data?.staleSoonCount > 0 && (
+        <section className="mb-6" aria-label="Freeze reminder">
+          <Card className="border-amber-200 bg-amber-50/50">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="size-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="size-5 text-amber-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground mb-1">
+                    {data.staleSoonCount} dose{data.staleSoonCount !== 1 ? 's' : ''} will go stale soon
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Freeze to pause freshness
+                  </p>
+                  <div className="flex gap-2">
+                    <Link href="/inventory?filter=fading">
+                      <Button variant="outline" size="sm">
+                        View doses
+                      </Button>
+                    </Link>
+                    <Button 
+                      size="sm"
+                      onClick={() => setShowFreezeConfirm(true)}
+                      disabled={isFreezing}
+                    >
+                      <Snowflake className="size-3 mr-1" />
+                      Freeze all
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
       {/* Last Brew - Memory, not action */}
       {!isLoading && data?.lastBrew && (
         <section className="mb-6" aria-label="Last brew">
@@ -323,6 +400,32 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* Freeze All Confirmation Dialog */}
+      <AlertDialog open={showFreezeConfirm} onOpenChange={setShowFreezeConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Freeze {data?.staleSoonCount} dose{data?.staleSoonCount !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              These doses are about to go stale. Freezing will pause freshness so you can enjoy them later.
+              {data?.staleSoonGroups && data.staleSoonGroups.length > 0 && (
+                <span className="block mt-2 text-xs">
+                  Doses: {data.staleSoonGroups.map((g: { vialCodes: string[] }) => g.vialCodes.join(", ")).join(", ")}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isFreezing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleFreezeAll}
+              disabled={isFreezing}
+            >
+              {isFreezing ? "Freezing..." : "Freeze all"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

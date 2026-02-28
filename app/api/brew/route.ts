@@ -135,7 +135,7 @@ export async function GET(req: Request) {
     JOIN coffees c ON c.id = bl.coffee_id
     JOIN vials v ON v.id = bl.dose_id
     LEFT JOIN users u ON u.id = bl.user_id
-    WHERE bl.cellar_id = ${cellarId}
+    WHERE bl.cellar_id = ${cellarId} AND bl.deleted_at IS NULL
     ORDER BY bl.created_at DESC
     LIMIT ${limit}
   ` : await sql`
@@ -162,6 +162,7 @@ export async function GET(req: Request) {
     JOIN coffees c ON c.id = bl.coffee_id
     JOIN vials v ON v.id = bl.dose_id
     LEFT JOIN users u ON u.id = bl.user_id
+    WHERE bl.deleted_at IS NULL
     ORDER BY bl.created_at DESC
     LIMIT ${limit}
   `;

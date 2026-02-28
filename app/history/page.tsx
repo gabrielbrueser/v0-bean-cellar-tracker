@@ -1,16 +1,34 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, Zap, ThumbsUp, Turtle } from "lucide-react";
+import { Clock, Zap, ThumbsUp, Turtle, MoreHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BrewLog } from "@/lib/types";
 import { useBrewLogs, useBrewStats } from "@/lib/hooks";
 import { useCellarContext } from "@/lib/cellar-context";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { mutate } from "swr";
 
 function FeedbackIcon({ feedback }: { feedback: string }) {
   const config = {
@@ -30,8 +48,11 @@ interface GroupedBrews {
 
 export default function HistoryPage() {
   const { currentCellar } = useCellarContext();
-  const { data: brewLogs, isLoading } = useBrewLogs(currentCellar?.id, 100);
-  const { data: stats } = useBrewStats(currentCellar?.id);
+  const { data: brewLogs, isLoading, mutate: mutateBrewLogs } = useBrewLogs(currentCellar?.id, 100);
+  const { data: stats, mutate: mutateStats } = useBrewStats(currentCellar?.id);
+  
+  const [brewToDelete, setBrewToDelete] = useState<BrewLog | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Group brews by month
   const groupedBrews = useMemo(() => {
@@ -50,6 +71,48 @@ export default function HistoryPage() {
   }, [brewLogs]);
 
   const monthKeys = Object.keys(groupedBrews);
+
+  const handleDeleteBrew = async () => {
+    if (!brewToDelete || !currentCellar?.id) return;
+    
+    setIsDeleting(true);
+    
+    // Optimistic UI update - remove from local state immediately
+    const previousBrews = brewLogs;
+    mutateBrewLogs(
+      brewLogs?.filter((b) => b.id !== brewToDelete.id),
+      false
+    );
+    
+    try {
+      const res = await fetch(`/api/brew/${brewToDelete.id}?cellarId=${currentCellar.id}`, {
+        method: "DELETE",
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to delete brew");
+      }
+      
+      toast.success("Brew deleted");
+      
+      // Revalidate stats to recompute totals
+      mutateStats();
+      
+      // Also refresh home data
+      const cellarParam = currentCellar.id ? `?cellarId=${currentCellar.id}` : "";
+      mutate(`/api/home${cellarParam}`);
+      mutate(`/api/coffees${cellarParam}`);
+      
+    } catch (err) {
+      // Rollback on error
+      mutateBrewLogs(previousBrews, false);
+      toast.error(err instanceof Error ? err.message : "Failed to delete brew");
+    } finally {
+      setIsDeleting(false);
+      setBrewToDelete(null);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
@@ -141,6 +204,24 @@ export default function HistoryPage() {
                               {log.vialCode}
                             </Badge>
                           )}
+                          {/* Overflow Menu */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon-sm" className="size-7">
+                                <MoreHorizontal className="size-4" />
+                                <span className="sr-only">More options</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => setBrewToDelete(log)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="size-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
 
@@ -167,6 +248,30 @@ export default function HistoryPage() {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!brewToDelete} onOpenChange={() => setBrewToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete brew?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the brew log for{" "}
+              <span className="font-medium">{brewToDelete?.coffeeName}</span> from your history.
+              Statistics will be recalculated. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBrew}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
