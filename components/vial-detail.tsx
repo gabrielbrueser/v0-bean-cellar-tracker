@@ -27,6 +27,7 @@ import { VialHistory } from "@/components/vial-history";
 import { ArrowLeft, Printer, Coffee, Droplets, Timer, AlertTriangle, Sparkles, CheckCircle2, Zap, ThumbsUp, Turtle, Snowflake, Pencil } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCoffees } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 
 interface VialDetailProps {
   vialId: string;
@@ -104,13 +105,17 @@ const GRIND_SCALES = {
   }
 };
 
-export function VialDetail({ vialId }: VialDetailProps) {
+  export function VialDetail({ vialId }: VialDetailProps) {
+  const { currentCellar } = useCellarContext();
   const { data: vial, isLoading: vialLoading } = useVial(vialId);
   const { data: activeFill } = useActiveFillSession(vialId);
   const { data: fillSessions } = useFillSessions(vialId);
   const { data: coffee } = useCoffee(activeFill?.coffeeId ?? null);
   const { data: doseTypes } = useDoseTypes();
-  const { data: allCoffees } = useCoffees();
+  const { data: allCoffees } = useCoffees(currentCellar?.id);
+  
+  // Helper to get cellar-scoped API URLs
+  const cellarParam = currentCellar?.id ? `?cellarId=${currentCellar.id}` : "";
   
   const [showFillDialog, setShowFillDialog] = useState(false);
   const [showBrewDialog, setShowBrewDialog] = useState(false);
@@ -206,7 +211,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
       mutate(`/api/vials/${vialId}`);
       mutate(`/api/vials/${vialId}/fill-sessions`);
       mutate(`/api/vials/${vialId}/active-fill`);
-      mutate("/api/inventory");
+      mutate(`/api/inventory${cellarParam}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update dose");
     } finally {
@@ -224,8 +229,8 @@ export function VialDetail({ vialId }: VialDetailProps) {
       const data = await res.json();
       toast.success(data.isFrozen ? "Dose frozen" : "Dose unfrozen");
       mutate(`/api/vials/${vialId}`);
-      mutate("/api/home");
-      mutate("/api/inventory");
+      mutate(`/api/home${cellarParam}`);
+      mutate(`/api/inventory${cellarParam}`);
     } catch {
       toast.error("Failed to toggle freeze state");
     } finally {
@@ -268,10 +273,11 @@ export function VialDetail({ vialId }: VialDetailProps) {
       // Refresh all relevant data
       mutate(`/api/vials/${vialId}`);
       mutate(`/api/vials/${vialId}/fill-sessions`);
-      mutate("/api/inventory");
+      mutate(`/api/inventory${cellarParam}`);
       mutate("/api/vials");
-      mutate("/api/brew");
-      mutate("/api/home");
+mutate(`/api/brew${cellarParam}`);
+  mutate(`/api/brew/stats${cellarParam}`);
+  mutate(`/api/home${cellarParam}`);
       
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to log brew");

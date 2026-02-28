@@ -55,11 +55,29 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const sql = getDb();
+  
+  // cellarId is REQUIRED - must be passed from client
+  const cellarId = body.cellarId;
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId is required to create a coffee" },
+      { status: 400 }
+    );
+  }
+  
   const rows = await sql`
-    INSERT INTO coffees (roaster, coffee_name, score, origin, producer, variety, altitude, tasting_notes, notes, link, process_method_id, color)
-    VALUES (${body.roaster || "Tanat"}, ${body.coffeeName}, ${body.score || 0}, ${body.origin}, ${body.producer || ""}, ${body.variety || ""}, ${body.altitude || ""}, ${body.tastingNotes || ""}, ${body.notes || ""}, ${body.link || ""}, ${body.processMethodId || null}, ${body.color || null})
+    INSERT INTO coffees (roaster, coffee_name, score, origin, producer, variety, altitude, tasting_notes, notes, link, process_method_id, color, cellar_id)
+    VALUES (${body.roaster || "Tanat"}, ${body.coffeeName}, ${body.score || 0}, ${body.origin}, ${body.producer || ""}, ${body.variety || ""}, ${body.altitude || ""}, ${body.tastingNotes || ""}, ${body.notes || ""}, ${body.link || ""}, ${body.processMethodId || null}, ${body.color || null}, ${cellarId})
     RETURNING *
   `;
+  
+  if (rows.length === 0) {
+    return NextResponse.json(
+      { error: "Failed to create coffee" },
+      { status: 500 }
+    );
+  }
+  
   const r = rows[0];
   return NextResponse.json({
     id: r.id,
@@ -75,6 +93,7 @@ export async function POST(req: NextRequest) {
     link: r.link,
     processMethodId: r.process_method_id,
     color: r.color,
+    cellarId: r.cellar_id,
     archived: r.archived ?? false,
     createdAt: r.created_at,
   });
