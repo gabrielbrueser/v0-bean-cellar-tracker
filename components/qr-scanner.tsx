@@ -3,11 +3,96 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Camera, X, Loader2, Keyboard } from "lucide-react";
+import { Camera, X, Loader2, Keyboard, Bug } from "lucide-react";
 
 interface QRScannerProps {
   onScan: (value: string) => void;
   onClose?: () => void;
+}
+
+/**
+ * Normalize and parse QR payload to extract vial code.
+ * Accepts all formats:
+ * - ESP-003, FLT-012 (plain label)
+ * - bc:ESP-003 (our preferred format)
+ * - dose:ESP-003 (alternative prefix)
+ * - bean-cellar://dose/ESP-003 (deep link)
+ * - https://domain.com/dose/ESP-003 or /doses/ESP-003 (URL)
+ * - ?code=ESP-003 (query param)
+ * - UUID format (internal id lookup)
+ */
+function parseQRValue(rawValue: string): string | null {
+  const value = rawValue.trim();
+  
+  if (!value) return null;
+  
+  // Check if it's a UUID (36 chars with dashes) - pass through as-is
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(value)) {
+    return value.toLowerCase();
+  }
+  
+  let code: string | null = null;
+  
+  // Format: bc:CODE
+  if (value.toLowerCase().startsWith("bc:")) {
+    code = value.substring(3);
+  }
+  // Format: dose:CODE
+  else if (value.toLowerCase().startsWith("dose:")) {
+    code = value.substring(5);
+  }
+  // Format: bean-cellar://dose/CODE
+  else if (value.toLowerCase().startsWith("bean-cellar://dose/")) {
+    code = value.substring(19);
+  }
+  // Format: URL with /dose/, /doses/, /vials/, or /vials/code/ path
+  else if (value.includes("/")) {
+    // Try URL parsing
+    try {
+      const url = new URL(value, "https://placeholder.com");
+      // Check query param: ?code=ESP-003
+      const queryCode = url.searchParams.get("code");
+      if (queryCode) {
+        code = queryCode;
+      } else {
+        // Extract last path segment
+        const pathMatch = url.pathname.match(/\/(?:dose|doses|vials)(?:\/code)?\/([A-Z]{2,3}-\d{3})/i);
+        if (pathMatch) {
+          code = pathMatch[1];
+        }
+      }
+    } catch {
+      // Not a valid URL, try regex on raw string
+      const pathMatch = value.match(/\/(?:dose|doses|vials)(?:\/code)?\/([A-Z]{2,3}-\d{3})/i);
+      if (pathMatch) {
+        code = pathMatch[1];
+      }
+    }
+  }
+  // Format: Plain vial code (ESP-001, FLT-001, etc.)
+  else {
+    const codeMatch = value.match(/^([A-Z]{2,3}-\d{3})$/i);
+    if (codeMatch) {
+      code = codeMatch[1];
+    }
+  }
+  
+  // Validate and normalize the code, then return in bc: format
+  if (code) {
+    code = code.toUpperCase().trim();
+    // Validate format: 2-3 uppercase letters + hyphen + 3 digits
+    if (/^[A-Z]{2,3}-\d{3}$/.test(code)) {
+      return `bc:${code}`;
+    }
+  }
+  
+  // If nothing matched but there's content, return original for fallback
+  if (value.length > 0) {
+    return value;
+  }
+  
+  return null;
 }
 
 export function QRScanner({ onScan, onClose }: QRScannerProps) {
@@ -19,6 +104,8 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
   const [initializing, setInitializing] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualCode, setManualCode] = useState("");
+  const [lastRawScan, setLastRawScan] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   const stopScanning = useCallback(() => {
     if (controlsRef.current) {
@@ -28,44 +115,11 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
     setScanning(false);
   }, []);
 
-  const parseQRValue = useCallback((rawValue: string): string | null => {
-    // Accept multiple QR payload formats:
-    // 1. bc:ESP-001 or bc:FLT-001 (original format)
-    // 2. vial:ESP-001 (alternative prefix)
-    // 3. Full URL like https://.../vials/ESP-001 or /vials/code/ESP-001
-    // 4. Plain code like ESP-001 or FLT-001
-
-    const value = rawValue.trim();
-
-    // Format: bc:CODE or vial:CODE
-    if (value.startsWith("bc:") || value.startsWith("vial:")) {
-      return value;
-    }
-
-    // Format: URL containing vial code
-    const urlMatch = value.match(/\/vials\/(?:code\/)?([A-Z]{2,3}-\d{3})/i);
-    if (urlMatch) {
-      return `bc:${urlMatch[1].toUpperCase()}`;
-    }
-
-    // Format: Plain vial code (ESP-001, FLT-001, etc.)
-    const codeMatch = value.match(/^([A-Z]{2,3}-\d{3})$/i);
-    if (codeMatch) {
-      return `bc:${codeMatch[1].toUpperCase()}`;
-    }
-
-    // Return original value if it looks like a valid payload
-    if (value.length > 0) {
-      return value;
-    }
-
-    return null;
-  }, []);
-
   const startScanning = useCallback(async () => {
     try {
       setError(null);
       setInitializing(true);
+      setLastRawScan(null);
 
       // Dynamically import @zxing/browser to avoid SSR issues
       const { BrowserQRCodeReader } = await import("@zxing/browser");
@@ -90,7 +144,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         throw new Error("No camera found on this device");
       }
 
-      // Prefer back camera (environment-facing)
+      // Prefer back camera (environment-facing) - important for iOS
       const backCamera = videoDevices.find(
         (d) =>
           d.label.toLowerCase().includes("back") ||
@@ -102,22 +156,24 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
       setInitializing(false);
       setScanning(true);
 
-      // Start decoding from video device
+      // Start decoding from video device with iOS-friendly constraints
       controlsRef.current = await reader.decodeFromVideoDevice(
         deviceId,
         videoRef.current!,
-        (result, error) => {
+        (result, err) => {
           if (result) {
-            const parsed = parseQRValue(result.getText());
+            const rawText = result.getText();
+            setLastRawScan(rawText);
+            
+            const parsed = parseQRValue(rawText);
             if (parsed) {
               stopScanning();
               onScan(parsed);
             }
           }
-          // Ignore errors during scanning (they happen continuously when no QR is visible)
-          if (error && error.name !== "NotFoundException") {
-            // Only log unexpected errors
-            console.warn("QR scan warning:", error.message);
+          // Ignore NotFoundException - this happens constantly when no QR is visible
+          if (err && err.name !== "NotFoundException") {
+            console.warn("[QRScanner] Warning:", err.message);
           }
         }
       );
@@ -138,7 +194,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         setError(`Could not start camera: ${message}`);
       }
     }
-  }, [onScan, parseQRValue, stopScanning]);
+  }, [onScan, stopScanning]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -271,13 +327,32 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         className="aspect-square w-full object-cover bg-muted"
         playsInline
         muted
+        autoPlay
       />
       {/* Scanning frame overlay */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div className="size-48 rounded-2xl border-2 border-primary/60" />
       </div>
+      
+      {/* Debug overlay (dev only) */}
+      {showDebug && lastRawScan && (
+        <div className="absolute bottom-12 left-2 right-2 bg-black/80 text-white p-2 rounded text-xs font-mono break-all">
+          <span className="text-muted-foreground">Last scan: </span>
+          {lastRawScan}
+        </div>
+      )}
+      
       {/* Control buttons */}
       <div className="absolute top-2 right-2 flex gap-2">
+        {/* Debug toggle button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`bg-card/80 backdrop-blur-sm ${showDebug ? "text-primary" : ""}`}
+          onClick={() => setShowDebug(!showDebug)}
+        >
+          <Bug className="size-4" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"
