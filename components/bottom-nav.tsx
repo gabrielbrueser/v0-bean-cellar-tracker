@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Package, Clock, Coffee, Settings, Plus } from "lucide-react";
+import { Home, Package, Clock, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/inventory", label: "Inventory", icon: Package },
-  { href: "/seal", label: "Seal", icon: Plus, highlight: true },
-  { href: "/brew", label: "Brew", icon: Clock },
+  { href: "/history", label: "History", icon: Clock },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -28,33 +27,6 @@ export function BottomNav() {
             item.href === "/"
               ? pathname === "/"
               : pathname.startsWith(item.href);
-          
-          // Special styling for the Seal button
-          if (item.highlight) {
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex flex-col items-center gap-0.5 py-2 px-3"
-                aria-current={isActive ? "page" : undefined}
-              >
-                <div className={cn(
-                  "flex items-center justify-center size-10 rounded-full -mt-4 shadow-lg transition-colors",
-                  isActive 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-primary/90 text-primary-foreground hover:bg-primary"
-                )}>
-                  <item.icon className="size-5" />
-                </div>
-                <span className={cn(
-                  "text-xs",
-                  isActive ? "text-primary font-semibold" : "text-muted-foreground"
-                )}>
-                  {item.label}
-                </span>
-              </Link>
-            );
-          }
           
           return (
             <Link

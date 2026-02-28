@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/collapsible";
 import { CoffeeForm } from "@/components/coffee-form";
 import { CoffeePhotoGallery } from "@/components/coffee-photo-gallery";
-import { ArrowLeft, Edit, ExternalLink, Clock, ChevronDown, Coffee as CoffeeIcon, Droplets } from "lucide-react";
+import { ArrowLeft, Edit, ExternalLink, Clock, ChevronDown, Coffee as CoffeeIcon, Droplets, Plus } from "lucide-react";
 import { StarRating } from "@/components/star-rating";
 import { toast } from "sonner";
 import { mutate } from "swr";
@@ -263,6 +263,14 @@ export default function CoffeeDetailPage({
           </div>
         </CardContent>
       </Card>
+
+      {/* Seal Dose Shortcut */}
+      <Link href={`/seal?coffee=${id}`} className="block mt-4">
+        <Button variant="outline" className="w-full h-12 gap-2">
+          <Plus className="size-4" />
+          Seal dose with this coffee
+        </Button>
+      </Link>
 
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">

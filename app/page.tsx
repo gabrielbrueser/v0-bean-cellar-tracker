@@ -10,13 +10,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QrCode, Plus, Coffee, ChevronRight, Sparkles, Leaf, Snowflake, Zap, ThumbsUp, Turtle, BarChart3 } from "lucide-react";
+import { QrCode, Package, Coffee, ChevronRight, Sparkles, Leaf, Snowflake, Zap, ThumbsUp, Turtle } from "lucide-react";
 
+// Strict time windows for greeting
 function getGreeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  if (hour >= 17 && hour < 23) return "Good evening";
+  return "Late night brew?";
 }
 
 function getRelativeTime(timestamp: string) {
@@ -25,36 +27,21 @@ function getRelativeTime(timestamp: string) {
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
 
   if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return "yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  return date.toLocaleDateString();
+  if (diffMins === 1) return "1 minute ago";
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  if (diffHours === 1) return "1 hour ago";
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  return `${Math.floor(diffHours / 24)} days ago`;
 }
 
 function getFreshnessLabel(days: number, isFrozen?: boolean) {
-  if (isFrozen) return { label: "Frozen", color: "bg-blue-500/15 text-blue-700" };
-  if (days < 7) return { label: "Resting", color: "bg-amber-500/15 text-amber-700" };
-  if (days <= 21) return { label: "Peak", color: "bg-green-500/15 text-green-700" };
-  if (days <= 35) return { label: "Fading", color: "bg-orange-500/15 text-orange-700" };
-  return { label: "Stale", color: "bg-red-500/15 text-red-700" };
-}
-
-function getColorClass(color: string | null) {
-  const colors: Record<string, string> = {
-    amber: "bg-amber-500",
-    orange: "bg-orange-500",
-    red: "bg-red-500",
-    pink: "bg-pink-500",
-    purple: "bg-purple-500",
-    blue: "bg-blue-500",
-    teal: "bg-teal-500",
-    green: "bg-green-500",
-  };
-  return color ? colors[color] : null;
+  if (isFrozen) return { label: "Frozen", color: "bg-blue-100 text-blue-700 border-blue-200" };
+  if (days < 7) return { label: "Resting", color: "bg-amber-100 text-amber-700 border-amber-200" };
+  if (days <= 21) return { label: "At peak", color: "bg-green-100 text-green-700 border-green-200" };
+  if (days <= 35) return { label: "Fading", color: "bg-orange-100 text-orange-700 border-orange-200" };
+  return { label: "Stale", color: "bg-red-100 text-red-700 border-red-200" };
 }
 
 // Feedback icon component
@@ -67,7 +54,25 @@ function FeedbackIcon({ feedback }: { feedback: string }) {
   
   if (!config) return null;
   const Icon = config.icon;
-  return <Icon className={`size-3.5 ${config.color}`} />;
+  return <Icon className={`size-4 ${config.color}`} />;
+}
+
+// Dynamic subtitle based on priority
+function DynamicSubtitle({ peakCount, frozenCount, lastBrewTime }: { 
+  peakCount: number; 
+  frozenCount: number; 
+  lastBrewTime: string | null;
+}) {
+  if (peakCount > 0) {
+    return <span>You have {peakCount} dose{peakCount !== 1 ? 's' : ''} at peak</span>;
+  }
+  if (frozenCount > 0) {
+    return <span>Your frozen coffee is ready</span>;
+  }
+  if (lastBrewTime) {
+    return <span>Last brew: {getRelativeTime(lastBrewTime)}</span>;
+  }
+  return <span>Ready to brew?</span>;
 }
 
 export default function HomePage() {
@@ -106,91 +111,94 @@ export default function HomePage() {
     );
   }
 
+  const greeting = getGreeting();
+  const isLateNight = greeting === "Late night brew?";
+
   return (
     <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
-      {/* 1. Greeting */}
+      {/* Header with time-aware greeting */}
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          {getGreeting()}
+          {greeting}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Ready to brew?
+          {isLateNight ? (
+            "Easy... just one more."
+          ) : isLoading ? (
+            <Skeleton className="h-4 w-40" />
+          ) : (
+            <DynamicSubtitle 
+              peakCount={data?.peakDoseCount || 0}
+              frozenCount={data?.frozenDoseCount || 0}
+              lastBrewTime={data?.lastBrew?.timestamp || null}
+            />
+          )}
         </p>
       </header>
 
-      {/* 2. Last Brew (from brew_logs) - hidden if no logs */}
-      {!isLoading && data?.lastBrew && (
-        <section className="mb-6" aria-label="Last brew">
-          <div className="flex items-center gap-2 mb-2">
-            <Coffee className="size-3.5 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Last brew
-            </span>
-          </div>
-          <div className="bg-muted/50 rounded-lg px-3 py-2.5">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="font-medium text-sm text-foreground truncate">
-                  {data.lastBrew.coffeeName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {data.lastBrew.brewMethod} &middot; {getRelativeTime(data.lastBrew.timestamp)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <FeedbackIcon feedback={data.lastBrew.brewFeedback} />
-              </div>
-            </div>
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-              <span>Grind: {data.lastBrew.grindSize}</span>
-              <span>Yield: {data.lastBrew.extractionGrams}g</span>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 3. Suggested Dose - primary CTA */}
-      <section className="mb-6" aria-label="Suggested brew">
+      {/* Hero Section - Brew Recommendations (up to 2 cards) */}
+      <section className="mb-6" aria-label="Brew recommendations">
         {isLoading ? (
-          <Card className="overflow-hidden">
-            <CardContent className="p-5">
-              <Skeleton className="h-4 w-20 mb-3" />
-              <Skeleton className="h-6 w-48 mb-2" />
-              <Skeleton className="h-4 w-32 mb-4" />
-              <Skeleton className="h-12 w-full" />
-            </CardContent>
-          </Card>
-        ) : data?.suggested ? (
-          <Card className="overflow-hidden border-2 shadow-sm">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                {getColorClass(data.suggested.color) && (
-                  <span className={`size-2.5 rounded-full ${getColorClass(data.suggested.color)}`} />
-                )}
-                <Badge 
-                  variant="secondary" 
-                  className={`text-xs font-medium ${getFreshnessLabel(data.suggested.daysSinceRoast, data.suggested.isFrozen).color}`}
-                >
-                  {data.suggested.isFrozen && <Snowflake className="size-3 mr-1" />}
-                  {getFreshnessLabel(data.suggested.daysSinceRoast, data.suggested.isFrozen).label}
-                </Badge>
-              </div>
-              
-              <h2 className="text-xl font-bold text-foreground mb-1">
-                {data.suggested.coffeeName}
-              </h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                {data.suggested.roaster} &middot; {data.suggested.gramsPerDose}g {data.suggested.doseTypeName}
-              </p>
+          <div className="space-y-3">
+            <Skeleton className="h-40 w-full rounded-xl" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </div>
+        ) : data?.heroRecommendations && data.heroRecommendations.length > 0 ? (
+          <div className="space-y-3">
+            {data.heroRecommendations.map((hero: {
+              vialId: string;
+              vialCode: string;
+              coffeeName: string;
+              roaster: string;
+              originCountry: string | null;
+              color: string | null;
+              doseTypeName: string;
+              method: string;
+              gramsPerDose: number;
+              daysSinceRoast: number;
+              isFrozen: boolean;
+            }) => {
+              const freshness = getFreshnessLabel(hero.daysSinceRoast, hero.isFrozen);
+              return (
+                <Card key={hero.vialId} className="overflow-hidden border-2 shadow-sm">
+                  <CardContent className="p-5">
+                    {/* Coffee name and roaster */}
+                    <h2 className="text-xl font-bold text-foreground mb-1">
+                      {hero.coffeeName}
+                    </h2>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {hero.roaster} · {hero.method === 'espresso' ? 'Espresso' : 'Filter'} · {hero.gramsPerDose}g
+                    </p>
 
-              <Link href={`/vials/${data.suggested.vialId}`}>
-                <Button className="w-full h-12 text-base font-semibold gap-2">
-                  <Sparkles className="size-4" />
-                  Brew my dose
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+                    {/* Status badges */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant="outline" className={freshness.color}>
+                        {freshness.label}
+                      </Badge>
+                      {hero.isFrozen && (
+                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                          <Snowflake className="size-3 mr-1" />
+                          Frozen
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Dose ID - critical for shelf matching */}
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Dose: <span className="font-mono font-bold text-foreground">{hero.vialCode}</span>
+                    </p>
+
+                    <Link href={`/vials/${hero.vialId}?brew=true`}>
+                      <Button className="w-full h-12 text-base font-semibold gap-2">
+                        <Sparkles className="size-4" />
+                        Brew this dose
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         ) : (
           <Card className="overflow-hidden border-dashed">
             <CardContent className="p-6 text-center">
@@ -203,7 +211,7 @@ export default function HomePage() {
               <p className="text-sm text-muted-foreground mb-4">
                 Seal one to get started
               </p>
-              <Link href="/batch-seal">
+              <Link href="/seal">
                 <Button variant="outline" size="sm">
                   Seal a dose
                 </Button>
@@ -213,23 +221,42 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* 4. Frozen Doses - shown if any exist */}
+      {/* Last Brew - Memory, not action */}
+      {!isLoading && data?.lastBrew && (
+        <section className="mb-6" aria-label="Last brew">
+          <Link href="/history" className="block">
+            <div className="bg-muted/50 rounded-lg px-4 py-3 hover:bg-muted/70 transition-colors">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                Last brew
+              </p>
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm text-foreground truncate">
+                    {data.lastBrew.coffeeName} · {data.lastBrew.brewMethod === 'espresso' ? 'Espresso' : 'Filter'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Grind {data.lastBrew.grindSize} · Yield {data.lastBrew.extractionGrams}g · {getRelativeTime(data.lastBrew.timestamp)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-3">
+                  <FeedbackIcon feedback={data.lastBrew.brewFeedback} />
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </div>
+              </div>
+            </div>
+          </Link>
+        </section>
+      )}
+
+      {/* Frozen Reminder - Contextual only */}
       {!isLoading && data?.frozenDoses && data.frozenDoses.length > 0 && (
         <section className="mb-6" aria-label="Frozen doses">
-          <div className="flex items-center gap-2 mb-3">
-            <Snowflake className="size-3.5 text-blue-500" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Frozen
-            </span>
-          </div>
           <div className="space-y-2">
-            {data.frozenDoses.slice(0, 3).map((dose: {
+            {data.frozenDoses.slice(0, 2).map((dose: {
               vialId: string;
               vialCode: string;
               coffeeName: string;
               roaster: string;
-              color: string | null;
-              doseTypeName: string;
               gramsPerDose: number;
             }) => (
               <Link 
@@ -237,19 +264,19 @@ export default function HomePage() {
                 href={`/vials/${dose.vialId}`}
                 className="block"
               >
-                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-blue-50/50 border border-blue-100 hover:bg-blue-50 transition-colors">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Snowflake className="size-4 text-blue-500 shrink-0" />
+                <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-blue-50/70 border border-blue-100 hover:bg-blue-100/50 transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Snowflake className="size-5 text-blue-500 shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">
-                        {dose.coffeeName}
+                        {dose.coffeeName} · {dose.vialCode}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {dose.vialCode} &middot; {dose.gramsPerDose}g
+                        Tap to thaw or brew
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+                  <ChevronRight className="size-4 text-blue-400 shrink-0" />
                 </div>
               </Link>
             ))}
@@ -257,100 +284,43 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 5. Brewed This Week (from brew_logs) */}
-      {!isLoading && data?.weekStats && (data.weekStats.cups > 0 || data.weekStats.grams > 0) && (
-        <section className="mb-6" aria-label="Weekly stats">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart3 className="size-3.5 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              This week
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-muted/50 p-3 text-center">
-              <p className="text-2xl font-bold text-foreground">{data.weekStats.cups}</p>
-              <p className="text-xs text-muted-foreground">Cups brewed</p>
+      {/* Stats - Glance only, two tiles */}
+      {!isLoading && (data?.weekStats?.cups > 0 || data?.monthStats?.cups > 0) && (
+        <section className="mb-6" aria-label="Brew stats">
+          <Link href="/history" className="block">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-muted/50 p-4 text-center hover:bg-muted/70 transition-colors">
+                <p className="text-2xl font-bold text-foreground">{data.weekStats?.cups || 0}</p>
+                <p className="text-xs text-muted-foreground">This week</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-4 text-center hover:bg-muted/70 transition-colors">
+                <p className="text-2xl font-bold text-foreground">{data.monthStats?.cups || 0}</p>
+                <p className="text-xs text-muted-foreground">This month</p>
+              </div>
             </div>
-            <div className="rounded-lg bg-muted/50 p-3 text-center">
-              <p className="text-2xl font-bold text-foreground">{Math.round(data.weekStats.grams)}g</p>
-              <p className="text-xs text-muted-foreground">Coffee used</p>
-            </div>
-          </div>
+          </Link>
         </section>
       )}
 
-      {/* Quick Actions */}
-      <section className="mb-6" aria-label="Quick actions">
+      {/* Bottom Actions - Clean, minimal */}
+      <section aria-label="Quick actions">
         <div className="flex gap-3">
           <Button
             variant="outline"
-            className="flex-1 h-11 gap-2"
+            className="flex-1 h-12 gap-2"
             onClick={() => setShowScanner(true)}
           >
             <QrCode className="size-4" />
             Scan dose
           </Button>
-          <Link href="/vials/create" className="flex-1">
-            <Button variant="outline" className="w-full h-11 gap-2">
-              <Plus className="size-4" />
-              New dose
+          <Link href="/inventory" className="flex-1">
+            <Button variant="outline" className="w-full h-12 gap-2">
+              <Package className="size-4" />
+              Go to Inventory
             </Button>
           </Link>
         </div>
       </section>
-
-      {/* Inventory Snapshot */}
-      {!isLoading && data?.inventory && data.inventory.length > 0 && (
-        <section className="mb-6" aria-label="Inventory">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-foreground">
-              On hand
-            </h3>
-            <Link 
-              href="/inventory" 
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-            >
-              View all
-              <ChevronRight className="size-3" />
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {data.inventory.map((item: {
-              coffeeId: string;
-              coffeeName: string;
-              roaster: string;
-              color: string | null;
-              doseTypeName: string;
-              count: number;
-            }) => (
-              <Link 
-                key={`${item.coffeeId}-${item.doseTypeName}`}
-                href={`/coffees/${item.coffeeId}`}
-                className="block"
-              >
-                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {getColorClass(item.color) && (
-                      <span className={`size-2 rounded-full shrink-0 ${getColorClass(item.color)}`} />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {item.coffeeName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.doseTypeName}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="text-xs shrink-0">
-                    {item.count} {item.count === 1 ? "dose" : "doses"}
-                  </Badge>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

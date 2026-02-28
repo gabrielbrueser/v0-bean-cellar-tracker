@@ -37,7 +37,11 @@ interface CoffeeItem {
   id: string;
   coffeeName: string;
   roaster: string;
+  originCountry?: string;
   archived: boolean;
+  lastRoastDate?: string;
+  lastBrewed?: string;
+  totalBrews?: number;
 }
 
 interface EmptyDose {
@@ -302,44 +306,69 @@ export default function SealCoffeePage() {
                 </CardContent>
               </Card>
             ) : (
-              filteredCoffees.map((coffee: CoffeeItem) => (
-                <Card 
-                  key={coffee.id}
-                  className={`cursor-pointer transition-all ${
-                    selectedCoffeeId === coffee.id 
-                      ? "ring-2 ring-primary border-primary" 
-                      : "hover:border-primary/50"
-                  }`}
-                  onClick={() => setSelectedCoffeeId(coffee.id)}
-                >
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Coffee className="size-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground truncate">
-                        {coffee.coffeeName}
-                      </p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {coffee.roaster}
-                      </p>
-                    </div>
-                    {selectedCoffeeId === coffee.id && (
-                      <CheckCircle2 className="size-5 text-primary shrink-0" />
-                    )}
-                  </CardContent>
-                </Card>
-              ))
+              filteredCoffees.map((coffee: CoffeeItem) => {
+                const formatDate = (dateStr?: string) => {
+                  if (!dateStr) return null;
+                  const date = new Date(dateStr);
+                  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                };
+                
+                return (
+                  <Card 
+                    key={coffee.id}
+                    className={`cursor-pointer transition-all ${
+                      selectedCoffeeId === coffee.id 
+                        ? "ring-2 ring-primary border-primary" 
+                        : "hover:border-primary/50"
+                    }`}
+                    onClick={() => setSelectedCoffeeId(coffee.id)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Coffee className="size-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-foreground truncate">
+                            {coffee.coffeeName}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {coffee.roaster}{coffee.originCountry ? ` · ${coffee.originCountry}` : ""}
+                          </p>
+                          <div className="text-xs text-muted-foreground mt-1.5 space-y-0.5">
+                            {coffee.lastRoastDate && (
+                              <p>Roasted: {formatDate(coffee.lastRoastDate)}</p>
+                            )}
+                            {coffee.lastBrewed && (
+                              <p>Last brewed: {formatDate(coffee.lastBrewed)}</p>
+                            )}
+                          </div>
+                        </div>
+                        {selectedCoffeeId === coffee.id && (
+                          <CheckCircle2 className="size-5 text-primary shrink-0" />
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             )}
           </div>
 
-          {/* Add new coffee link */}
-          <Link href="/coffees/create" className="block">
-            <Button variant="outline" className="w-full gap-2">
-              <Plus className="size-4" />
-              Add New Coffee
-            </Button>
-          </Link>
+          {/* Manage coffees link */}
+          <div className="flex gap-2">
+            <Link href="/coffees/create" className="flex-1">
+              <Button variant="outline" className="w-full gap-2">
+                <Plus className="size-4" />
+                Add Coffee
+              </Button>
+            </Link>
+            <Link href="/coffees" className="flex-1">
+              <Button variant="ghost" className="w-full text-muted-foreground">
+                Manage coffees
+              </Button>
+            </Link>
+          </div>
 
           {/* Next button */}
           {selectedCoffeeId && (

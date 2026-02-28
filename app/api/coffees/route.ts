@@ -4,13 +4,25 @@ import { getDb } from "@/lib/db";
 // GET /api/coffees
 export async function GET() {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM coffees ORDER BY created_at DESC`;
+  
+  // Get coffees with last brewed date and total brews
+  const rows = await sql`
+    SELECT 
+      c.*,
+      (SELECT MAX(bl.created_at) FROM brew_logs bl WHERE bl.coffee_id = c.id) as last_brewed,
+      (SELECT COUNT(*)::int FROM brew_logs bl WHERE bl.coffee_id = c.id) as total_brews,
+      (SELECT fs.roast_date FROM fill_sessions fs WHERE fs.coffee_id = c.id ORDER BY fs.created_at DESC LIMIT 1) as last_roast_date
+    FROM coffees c
+    ORDER BY c.created_at DESC
+  `;
+  
   const coffees = rows.map((r) => ({
     id: r.id,
     roaster: r.roaster,
     coffeeName: r.coffee_name,
     score: r.score,
     origin: r.origin,
+    originCountry: r.origin_country,
     producer: r.producer,
     variety: r.variety,
     altitude: r.altitude,
@@ -21,6 +33,9 @@ export async function GET() {
     color: r.color,
     archived: r.archived ?? false,
     createdAt: r.created_at,
+    lastBrewed: r.last_brewed,
+    totalBrews: r.total_brews || 0,
+    lastRoastDate: r.last_roast_date,
   }));
   return NextResponse.json(coffees);
 }
