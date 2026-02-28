@@ -48,11 +48,14 @@ interface GroupedBrews {
 
 export default function HistoryPage() {
   const { currentCellar, isLoading: cellarLoading } = useCellarContext();
-  const { data: brewLogs, isLoading: brewsLoading, mutate: mutateBrewLogs } = useBrewLogs(currentCellar?.id, 100);
+  const { data: brewLogs, isLoading: brewsLoading, error: brewsError, mutate: mutateBrewLogs } = useBrewLogs(currentCellar?.id, 100);
   const { data: stats, mutate: mutateStats } = useBrewStats(currentCellar?.id);
   
   // Combined loading: cellar loading OR (we have cellar but brews still loading)
   const isLoading = cellarLoading || (currentCellar?.id && brewsLoading);
+  
+  // Compute actual SWR key for debugging
+  const swrKey = currentCellar?.id ? `/api/brew?cellarId=${currentCellar.id}&limit=100` : null;
   
   const [brewToDelete, setBrewToDelete] = useState<BrewLog | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -119,6 +122,24 @@ export default function HistoryPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
+      {/* TEMP DEBUG - Remove after verification */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs font-mono">
+          <div className="font-bold text-yellow-800">DEBUG INFO</div>
+          <div>cellarId: {currentCellar?.id || "NULL"}</div>
+          <div>cellarName: {currentCellar?.name || "NULL"}</div>
+          <div>swrKey: {swrKey || "NULL"}</div>
+          <div>brewLogs.length: {brewLogs?.length ?? "undefined"}</div>
+        </div>
+      )}
+      
+      {/* Error Banner */}
+      {brewsError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+          <span className="font-medium">Error loading history:</span> {brewsError.message}
+        </div>
+      )}
+      
       {/* Header */}
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">

@@ -30,6 +30,7 @@ import {
   Coffee
 } from "lucide-react";
 import { useCellarContext } from "@/lib/cellar-context";
+import { fetcher } from "@/lib/fetcher";
 
 interface Dose {
   id: string;
@@ -54,8 +55,6 @@ interface InventoryGroup {
 }
 
 type FilterType = "all" | "sealed" | "frozen";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 // Returns freshness badge info - NEVER returns Frozen (that's handled separately)
 function getFreshnessInfo(roastDate: string | null) {
@@ -118,10 +117,13 @@ export default function InventoryPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   // Use null key when no cellarId - SWR won't fetch until cellarId is available
   const inventoryUrl = currentCellar?.id ? `/api/inventory?cellarId=${currentCellar.id}` : null;
-  const { data: groups, isLoading: inventoryLoading } = useSWR<InventoryGroup[]>(inventoryUrl, fetcher);
+  const { data: groups, isLoading: inventoryLoading, error: inventoryError } = useSWR<InventoryGroup[]>(inventoryUrl, fetcher);
   
   // Combined loading: cellar loading OR (we have cellar but inventory still loading)
   const isLoading = cellarLoading || (currentCellar?.id && inventoryLoading);
+  
+  // Compute actual SWR key for debugging
+  const swrKey = inventoryUrl;
   const [selectedGroup, setSelectedGroup] = useState<InventoryGroup | null>(null);
   const [isBrewDialogOpen, setIsBrewDialogOpen] = useState(false);
   const [isFreezeLoading, setIsFreezeLoading] = useState(false);
@@ -225,6 +227,24 @@ export default function InventoryPage() {
 
   return (
   <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
+  {/* TEMP DEBUG - Remove after verification */}
+  {process.env.NODE_ENV === "development" && (
+    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs font-mono">
+      <div className="font-bold text-yellow-800">DEBUG INFO</div>
+      <div>cellarId: {currentCellar?.id || "NULL"}</div>
+      <div>cellarName: {currentCellar?.name || "NULL"}</div>
+      <div>swrKey: {swrKey || "NULL"}</div>
+      <div>groups.length: {groups?.length ?? "undefined"}</div>
+    </div>
+  )}
+  
+  {/* Error Banner */}
+  {inventoryError && (
+    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+      <span className="font-medium">Error loading inventory:</span> {inventoryError.message}
+    </div>
+  )}
+  
   {/* Header */}
   <header className="mb-4 flex items-start justify-between">
         <div>

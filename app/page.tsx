@@ -84,10 +84,13 @@ export default function HomePage() {
   const [showFreezeConfirm, setShowFreezeConfirm] = useState(false);
   const [isFreezing, setIsFreezing] = useState(false);
   const { currentCellar, isLoading: cellarLoading } = useCellarContext();
-  const { data, isLoading: homeLoading, mutate: mutateHome } = useHomeData(currentCellar?.id);
+  const { data, isLoading: homeLoading, error: homeError, mutate: mutateHome } = useHomeData(currentCellar?.id);
   
   // Combined loading: cellar loading OR (we have cellar but home data still loading)
   const isLoading = cellarLoading || (currentCellar?.id && homeLoading);
+  
+  // Compute actual SWR key for debugging
+  const swrKey = currentCellar?.id ? `/api/home?cellarId=${currentCellar.id}` : null;
 
   const handleFreezeAll = async () => {
     if (!data?.staleSoonDoseIds?.length || !currentCellar?.id) return;
@@ -160,6 +163,25 @@ export default function HomePage() {
   
   return (
   <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
+  {/* TEMP DEBUG - Remove after verification */}
+  {process.env.NODE_ENV === "development" && (
+    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs font-mono">
+      <div className="font-bold text-yellow-800">DEBUG INFO</div>
+      <div>cellarId: {currentCellar?.id || "NULL"}</div>
+      <div>cellarName: {currentCellar?.name || "NULL"}</div>
+      <div>swrKey: {swrKey || "NULL"}</div>
+      <div>homeLoading: {String(homeLoading)}</div>
+      <div>hasData: {data ? "yes" : "no"}</div>
+    </div>
+  )}
+  
+  {/* Error Banner */}
+  {homeError && (
+    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+      <span className="font-medium">Error loading home:</span> {homeError.message}
+    </div>
+  )}
+  
   {/* Header with time-aware greeting */}
   <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
