@@ -1,13 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 
 // POST /api/vials/:id/rename — rename a vial's display code
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const cellarId = req.nextUrl.searchParams.get("cellarId");
   const sql = getDb();
+
+  // REQUIRE cellarId
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
 
   try {
     const { newCode } = await req.json();
@@ -27,10 +36,10 @@ export async function POST(
       );
     }
 
-    // Get the current vial to check prefix
-    const currentVials = await sql`SELECT * FROM vials WHERE id = ${id}`;
+    // Get the current vial and validate cellar ownership
+    const currentVials = await sql`SELECT * FROM vials WHERE id = ${id} AND cellar_id = ${cellarId}`;
     if (currentVials.length === 0) {
-      return NextResponse.json({ error: "Vial not found" }, { status: 404 });
+      return NextResponse.json({ error: "Dose not found in this cellar" }, { status: 404 });
     }
 
     const currentVial = currentVials[0];
@@ -45,9 +54,9 @@ export async function POST(
       );
     }
 
-    // Check if the new code is already in use by another vial
+    // Check if the new code is already in use by another vial in this cellar
     const existingVials = await sql`
-      SELECT id FROM vials WHERE vial_code = ${code} AND id != ${id}
+      SELECT id FROM vials WHERE vial_code = ${code} AND id != ${id} AND cellar_id = ${cellarId}
     `;
     if (existingVials.length > 0) {
       return NextResponse.json(

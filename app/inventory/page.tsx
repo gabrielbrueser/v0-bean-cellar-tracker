@@ -166,14 +166,19 @@ export default function InventoryPage() {
   };
 
   const handleFreezeToggle = async (group: InventoryGroup) => {
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
     setIsFreezeLoading(true);
     const action = group.isFrozen ? "unfreeze" : "freeze";
     let successCount = 0;
     let failCount = 0;
+    const cellarParam = `cellarId=${currentCellar.id}`;
 
     for (const dose of group.doses) {
       try {
-        const res = await fetch(`/api/vials/${dose.id}/freeze`, {
+        const res = await fetch(`/api/vials/${dose.id}/freeze?${cellarParam}`, {
           method: "POST",
         });
         if (res.ok) successCount++;
@@ -184,9 +189,9 @@ export default function InventoryPage() {
     }
 
     if (successCount > 0) {
-  toast.success(`${successCount} dose${successCount !== 1 ? "s" : ""} ${action === "freeze" ? "frozen" : "unfrozen"}`);
-  mutate(inventoryUrl);
-  mutate(currentCellar?.id ? `/api/home?cellarId=${currentCellar.id}` : "/api/home");
+      toast.success(`${successCount} dose${successCount !== 1 ? "s" : ""} ${action === "freeze" ? "frozen" : "unfrozen"}`);
+      mutate(inventoryUrl);
+      mutate(`/api/home?${cellarParam}`);
     }
     if (failCount > 0) {
       toast.error(`Failed to ${action} ${failCount} dose${failCount !== 1 ? "s" : ""}`);

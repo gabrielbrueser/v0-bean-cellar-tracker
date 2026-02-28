@@ -3,10 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAllVials, useDoseTypes } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { QRCodeSVG, getVialQRUrl } from "@/components/qr-code";
 import { ArrowLeft, Printer, Package } from "lucide-react";
 
@@ -23,12 +25,25 @@ interface VialItem {
 }
 
 export default function PrintLabelsPage() {
-  const { data: allVials } = useAllVials();
+  const { currentCellar, isLoading: cellarLoading } = useCellarContext();
+  const { data: allVials, isLoading: vialsLoading } = useAllVials(currentCellar?.id);
   const { data: doseTypes } = useDoseTypes();
   const [selectedVials, setSelectedVials] = useState<string[]>([]);
   const [showPrintView, setShowPrintView] = useState(false);
 
   const vials = allVials || [];
+
+  // Show loading state while cellar or vials are loading
+  if (cellarLoading || !currentCellar?.id || vialsLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   // Group vials by dose type
   const vialsByDoseType = vials.reduce((acc: Record<string, VialItem[]>, vial: VialItem) => {

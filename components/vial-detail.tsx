@@ -220,9 +220,13 @@ const GRIND_SCALES = {
   };
 
   const handleFreezeToggle = async () => {
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
     setFreezeLoading(true);
     try {
-      const res = await fetch(`/api/vials/${vialId}/freeze`, {
+      const res = await fetch(`/api/vials/${vialId}/freeze${cellarParam}`, {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to toggle freeze");
@@ -245,10 +249,14 @@ const GRIND_SCALES = {
 
   const handleConfirmBrew = async () => {
     if (!activeFill) return;
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
     setBrewLoading(true);
     
     try {
-      const res = await fetch("/api/brew", {
+      const res = await fetch(`/api/brew${cellarParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -274,7 +282,7 @@ const GRIND_SCALES = {
       mutate(`/api/vials/${vialId}`);
       mutate(`/api/vials/${vialId}/fill-sessions`);
       mutate(`/api/inventory${cellarParam}`);
-      mutate("/api/vials");
+      mutate(`/api/vials${cellarParam}`);
 mutate(`/api/brew${cellarParam}`);
   mutate(`/api/brew/stats${cellarParam}`);
   mutate(`/api/home${cellarParam}`);

@@ -2,13 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 
-// GET /api/vials — list all doses
-export async function GET() {
+// GET /api/vials — list doses for a cellar
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const cellarId = searchParams.get("cellarId");
+  
+  // REQUIRE cellarId to prevent returning all doses
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
+  
   const sql = getDb();
   const rows = await sql`
-    SELECT v.*, dt.name as dose_type_name, dt.grams_per_dose, dt.prefix
+    SELECT v.*, dt.name as dose_type_name, dt.grams_per_dose, dt.prefix,
+      fs.id as fill_session_id, c.coffee_name, c.roaster
     FROM vials v
     JOIN dose_types dt ON v.dose_type_id = dt.id
+    LEFT JOIN fill_sessions fs ON fs.vial_id = v.id AND fs.status = 'FULL'
+    LEFT JOIN coffees c ON c.id = fs.coffee_id
+    WHERE v.cellar_id = ${cellarId}
     ORDER BY v.created_at DESC
   `;
   const vials = rows.map((r) => ({
@@ -20,8 +35,12 @@ export async function GET() {
     qrValue: r.qr_value,
     status: r.status,
     createdAt: r.created_at,
+    coffeeName: r.coffee_name,
+    roaster: r.roaster,
   }));
-  return NextResponse.json(vials);
+  return NextResponse.json(vials, {
+    headers: { "Cache-Control": "no-store, max-age=0" },
+  });
 }
 
 /**
@@ -59,6 +78,16 @@ async function computeLowestAvailableNumber(sql: ReturnType<typeof getDb>, prefi
  */
 export async function POST(req: NextRequest) {
   const MAX_RETRIES = 5;
+  const { searchParams } = new URL(req.url);
+  const cellarId = searchParams.get("cellarId");
+  
+  // REQUIRE cellarId to ensure dose is created in correct cellar
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
   
   try {
     const body = await req.json();
@@ -93,8 +122,8 @@ export async function POST(req: NextRequest) {
 
         // Attempt insert - will fail with unique constraint if another request got there first
         const rows = await sql`
-          INSERT INTO vials (id, dose_type_id, vial_code, qr_value, status, is_frozen)
-          VALUES (${id}, ${doseTypeId}, ${doseCode}, ${qrValue}, 'EMPTY', false)
+          INSERT INTO vials (id, dose_type_id, vial_code, qr_value, status, is_frozen, cellar_id)
+          VALUES (${id}, ${doseTypeId}, ${doseCode}, ${qrValue}, 'EMPTY', false, ${cellarId})
           RETURNING *
         `;
 

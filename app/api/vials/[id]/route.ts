@@ -1,13 +1,23 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 
 export async function GET(
-  _req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const cellarId = req.nextUrl.searchParams.get("cellarId");
   const sql = getDb();
-  const rows = await sql`SELECT * FROM vials WHERE id = ${id}`;
+  
+  // cellarId is optional for GET (lookup by QR can be cross-cellar initially)
+  // But we still filter if provided
+  let rows;
+  if (cellarId) {
+    rows = await sql`SELECT * FROM vials WHERE id = ${id} AND cellar_id = ${cellarId}`;
+  } else {
+    rows = await sql`SELECT * FROM vials WHERE id = ${id}`;
+  }
+  
   if (rows.length === 0) {
     return NextResponse.json(null);
   }
@@ -21,15 +31,34 @@ export async function GET(
     status: r.status,
     isFrozen: r.is_frozen ?? false,
     frozenAt: r.frozen_at ?? null,
+    cellarId: r.cellar_id,
   });
 }
 
 export async function DELETE(
-  _req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const cellarId = req.nextUrl.searchParams.get("cellarId");
   const sql = getDb();
+
+  // REQUIRE cellarId for DELETE
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
+
+  // Validate dose belongs to this cellar
+  const vialRows = await sql`SELECT * FROM vials WHERE id = ${id} AND cellar_id = ${cellarId}`;
+  if (vialRows.length === 0) {
+    return NextResponse.json(
+      { error: "Dose not found in this cellar" },
+      { status: 404 }
+    );
+  }
 
   try {
     // Delete related records first (cascade)

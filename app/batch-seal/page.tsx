@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { mutate } from "swr";
 import { toast } from "sonner";
 import { useCoffees, useDoseTypes, useAllVials } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -21,9 +23,10 @@ import {
 import { ArrowLeft, Package, CheckCircle2 } from "lucide-react";
 
 export default function BatchSealPage() {
-  const { data: coffees } = useCoffees();
-  const { data: doseTypes } = useDoseTypes();
-  const { data: allVials } = useAllVials("EMPTY");
+  const { currentCellar, isLoading: cellarLoading } = useCellarContext();
+  const { data: coffees, isLoading: coffeesLoading } = useCoffees(currentCellar?.id);
+  const { data: doseTypes, isLoading: doseTypesLoading } = useDoseTypes();
+  const { data: allVials, isLoading: vialsLoading } = useAllVials(currentCellar?.id, "EMPTY");
   
   const [coffeeId, setCoffeeId] = useState("");
   const [roastDate, setRoastDate] = useState("");
@@ -31,6 +34,9 @@ export default function BatchSealPage() {
   const [customGrams, setCustomGrams] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [completed, setCompleted] = useState(false);
+
+  // Helper for cellar-scoped SWR keys
+  const cellarParam = currentCellar?.id ? `cellarId=${currentCellar.id}` : "";
 
   // Filter to only empty vials
   const emptyVials = allVials?.filter((v: { status: string }) => v.status === "EMPTY") || [];
@@ -73,6 +79,11 @@ export default function BatchSealPage() {
       return;
     }
 
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
+
     setLoading(true);
     let successCount = 0;
     let errorCount = 0;
@@ -82,7 +93,7 @@ export default function BatchSealPage() {
       if (!vial) continue;
 
       try {
-        const res = await fetch(`/api/vials/${vialId}/fill`, {
+        const res = await fetch(`/api/vials/${vialId}/fill?${cellarParam}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -104,9 +115,10 @@ export default function BatchSealPage() {
 
     if (successCount > 0) {
       setCompleted(true);
-      mutate("/api/inventory");
-      mutate("/api/vials/all");
-      mutate("/api/vials");
+      // Mutate with exact SWR keys
+      mutate(`/api/inventory?${cellarParam}`);
+      mutate(`/api/vials/all?${cellarParam}`);
+      mutate(`/api/vials?${cellarParam}`);
     }
 
     if (errorCount > 0) {
@@ -115,6 +127,18 @@ export default function BatchSealPage() {
 
     setLoading(false);
   };
+
+  // Loading state
+  if (cellarLoading || !currentCellar?.id || coffeesLoading || doseTypesLoading || vialsLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   if (completed) {
     return (

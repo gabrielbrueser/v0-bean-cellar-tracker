@@ -10,8 +10,10 @@ export function useInventory(cellarId?: string | null) {
   return useSWR(url, fetcher);
 }
 
-export function useVials() {
-  return useSWR("/api/vials", fetcher);
+export function useVials(cellarId?: string | null) {
+  // Use null key when no cellarId - SWR won't fetch until cellarId is available
+  const url = cellarId ? `/api/vials?cellarId=${cellarId}` : null;
+  return useSWR(url, fetcher);
 }
 
 export function useCoffees(cellarId?: string | null) {
@@ -59,8 +61,13 @@ export function useActivity() {
   return useSWR("/api/activity", fetcher);
 }
 
-export function useAllVials(status?: "FULL" | "EMPTY" | null) {
-  const url = status ? `/api/vials/all?status=${status}` : "/api/vials/all";
+export function useAllVials(cellarId?: string | null, status?: "FULL" | "EMPTY" | null) {
+  // Use null key when no cellarId - SWR won't fetch until cellarId is available
+  if (!cellarId) return useSWR(null, fetcher);
+  const params = new URLSearchParams();
+  params.set("cellarId", cellarId);
+  if (status) params.set("status", status);
+  const url = `/api/vials/all?${params.toString()}`;
   return useSWR(url, fetcher);
 }
 
