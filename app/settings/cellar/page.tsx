@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSession } from "next-auth/react";
 import { useCellarContext } from "@/lib/cellar-context";
 import { useCellarInvites } from "@/lib/hooks";
 import { mutate } from "swr";
@@ -36,8 +37,8 @@ interface Invite {
   expiresAt: string;
 }
 
-export default function CellarSettingsPage() {
-  const { currentCellar, cellars, isLoading: cellarLoading } = useCellarContext();
+function CellarSettingsContent() {
+  const { currentCellar, isLoading: cellarLoading } = useCellarContext();
   const { data: invites, isLoading: invitesLoading } = useCellarInvites(currentCellar?.id || null);
   
   const [email, setEmail] = useState("");
@@ -263,5 +264,46 @@ export default function CellarSettingsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="mx-auto max-w-lg px-4 pt-6 pb-8">
+      <Skeleton className="h-6 w-32 mb-4" />
+      <Skeleton className="h-8 w-48 mb-2" />
+      <Skeleton className="h-4 w-32 mb-6" />
+      <Skeleton className="h-64 w-full mb-4" />
+      <Skeleton className="h-48 w-full" />
+    </div>
+  );
+}
+
+export default function CellarSettingsPage() {
+  const { status } = useSession();
+  
+  // Don't render cellar content until authenticated
+  if (status === "loading") {
+    return <LoadingFallback />;
+  }
+  
+  if (status === "unauthenticated") {
+    return (
+      <div className="mx-auto max-w-lg px-4 pt-6 pb-8">
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              Please sign in to access cellar settings.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <CellarSettingsContent />
+    </Suspense>
   );
 }

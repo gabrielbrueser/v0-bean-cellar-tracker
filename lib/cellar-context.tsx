@@ -75,7 +75,14 @@ export function CellarProvider({ children }: { children: ReactNode }) {
 export function useCellarContext() {
   const ctx = useContext(CellarContext);
   if (!ctx) {
-    throw new Error("useCellarContext must be used within CellarProvider");
+    // Return a safe default during SSR/prerender when provider isn't available
+    return {
+      cellars: [],
+      currentCellar: null,
+      setCurrentCellarId: () => {},
+      isLoading: true,
+      refetch: () => {},
+    };
   }
   return ctx;
 }
