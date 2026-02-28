@@ -56,15 +56,8 @@ type FilterType = "all" | "sealed" | "frozen";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-function getFreshnessInfo(roastDate: string | null, isFrozen: boolean) {
-  if (isFrozen) {
-    return {
-      label: "Frozen",
-      color: "bg-blue-100 text-blue-700 border-blue-200",
-      icon: Snowflake,
-    };
-  }
-  
+// Returns freshness badge info - NEVER returns Frozen (that's handled separately)
+function getFreshnessInfo(roastDate: string | null) {
   if (!roastDate) {
     return {
       label: "Fresh",
@@ -102,6 +95,22 @@ function getFreshnessInfo(roastDate: string | null, isFrozen: boolean) {
   }
 }
 
+// Sort dose codes by their numeric suffix (ESP-001, ESP-002, etc.)
+function sortDosesByCode(doses: Dose[]): Dose[] {
+  return [...doses].sort((a, b) => {
+    const numA = parseInt(a.vialCode.replace(/[^0-9]/g, "")) || 0;
+    const numB = parseInt(b.vialCode.replace(/[^0-9]/g, "")) || 0;
+    return numA - numB;
+  });
+}
+
+// Generate group key for routing
+function getGroupKey(group: InventoryGroup): string {
+  return encodeURIComponent(
+    `${group.coffeeId}|${group.doseTypeId}|${group.isFrozen ? "frozen" : "sealed"}`
+  );
+}
+
 export default function InventoryPage() {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterType>("all");
@@ -126,22 +135,27 @@ export default function InventoryPage() {
     setIsBrewDialogOpen(true);
   };
 
-  // Select the best dose for brewing (FIFO, prefer not frozen, not stale)
+  // Select the best dose for brewing (FIFO - already sorted by sealedAt ASC from API)
   const selectBestDose = (group: InventoryGroup) => {
-    // Doses are already sorted by sealedAt ASC (FIFO) from the API
-    // Just return the first one - they're already the same frozen state in a group
     return group.doses[0];
   };
 
   const handleConfirmBrew = () => {
     if (!selectedGroup || selectedGroup.doses.length === 0) return;
-    
-    // Pick the best dose for brewing
     const bestDose = selectBestDose(selectedGroup);
-    
-    // Navigate to vial detail page to complete the brew
     router.push(`/vials/${bestDose.id}?brew=true`);
     setIsBrewDialogOpen(false);
+  };
+
+  // Navigate to appropriate detail page based on group size
+  const handleViewDetails = (group: InventoryGroup) => {
+    if (group.doses.length === 1) {
+      // Single dose: go directly to dose detail
+      router.push(`/vials/${group.doses[0].id}`);
+    } else {
+      // Multiple doses: go to group details page
+      router.push(`/inventory/group?key=${getGroupKey(group)}`);
+    }
   };
 
   const handleFreezeToggle = async (group: InventoryGroup) => {
@@ -172,6 +186,29 @@ export default function InventoryPage() {
     }
 
     setIsFreezeLoading(false);
+  };
+
+  // Render status badges - single source of truth
+  const renderStatusBadges = (group: InventoryGroup) => {
+    const freshness = getFreshnessInfo(group.roastDate);
+    const FreshnessIcon = freshness.icon;
+    
+    return (
+      <div className="flex items-center gap-2 shrink-0 ml-2">
+        {/* Freshness badge - always shown */}
+        <Badge variant="outline" className={freshness.color}>
+          <FreshnessIcon className="size-3 mr-1" />
+          {freshness.label}
+        </Badge>
+        {/* Frozen badge - only if frozen */}
+        {group.isFrozen && (
+          <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+            <Snowflake className="size-3 mr-1" />
+            Frozen
+          </Badge>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -255,22 +292,16 @@ export default function InventoryPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {filteredGroups.map((group, idx) => {
-            const freshness = getFreshnessInfo(group.roastDate, group.isFrozen);
-            const FreshnessIcon = freshness.icon;
+            const sortedDoses = sortDosesByCode(group.doses);
             
             return (
               <Card 
                 key={`${group.coffeeId}-${group.doseTypeId}-${group.isFrozen}-${idx}`} 
                 className="overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => {
-                  // Navigate to the first dose in the group
-                  if (group.doses.length > 0) {
-                    router.push(`/vials/${group.doses[0].id}`);
-                  }
-                }}
+                onClick={() => handleViewDetails(group)}
               >
                 <CardContent className="p-4">
-                  {/* Header row: Coffee name + freshness badge */}
+                  {/* Header row: Coffee name + status badges */}
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-lg text-foreground truncate">
@@ -280,33 +311,30 @@ export default function InventoryPage() {
                         {group.roaster} · {group.doseTypeName} · {group.gramsPerDose}g
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      {group.isFrozen && (
-                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
-                          <Snowflake className="size-3 mr-1" />
-                          Frozen
-                        </Badge>
-                      )}
-                      <Badge 
-                        variant="outline" 
-                        className={freshness.color}
-                      >
-                        <FreshnessIcon className="size-3 mr-1" />
-                        {freshness.label}
-                      </Badge>
-                    </div>
+                    {renderStatusBadges(group)}
                   </div>
 
                   {/* Big count */}
-                  <div className="flex items-baseline gap-1 mb-2">
+                  <div className="flex items-baseline gap-1 mb-3">
                     <span className="text-3xl font-bold text-foreground">{group.count}</span>
                     <span className="text-sm text-muted-foreground">dose{group.count !== 1 ? "s" : ""}</span>
                   </div>
 
-                  {/* Dose IDs - compact and secondary */}
-                  <p className="text-xs text-muted-foreground font-mono mb-4 truncate">
-                    {group.doses.map(d => d.vialCode).join(" · ")}
-                  </p>
+                  {/* Dose ID Chips - clickable, sorted ascending, wrap */}
+                  <div 
+                    className="flex flex-wrap gap-1.5 mb-4" 
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {sortedDoses.map((dose) => (
+                      <Link key={dose.id} href={`/vials/${dose.id}`}>
+                        <button
+                          className="inline-flex items-center justify-center min-h-[36px] px-3 py-1.5 text-xs font-mono font-medium rounded-full border border-border bg-secondary/50 hover:bg-primary/10 hover:border-primary/30 transition-colors"
+                        >
+                          {dose.vialCode}
+                        </button>
+                      </Link>
+                    ))}
+                  </div>
 
                   {/* Actions - stop propagation to prevent card click */}
                   <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
@@ -317,11 +345,13 @@ export default function InventoryPage() {
                       <Coffee className="size-4 mr-2" />
                       Brew
                     </Button>
-                    <Link href={`/vials/${group.doses[0]?.id}`} className="flex-1">
-                      <Button variant="outline" className="w-full">
-                        View details
-                      </Button>
-                    </Link>
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => handleViewDetails(group)}
+                    >
+                      View details
+                    </Button>
                     <Button
                       variant="outline"
                       size="icon"
