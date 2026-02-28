@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { format, differenceInDays } from "date-fns";
 import { mutate } from "swr";
 import { toast } from "sonner";
-import { useVial, useActiveFillSession, useFillSessions, useCoffee, useDoseTypes } from "@/lib/hooks";
+import { useVial, useActiveFillSession, useFillSessions, useCoffee, useDoseTypes, useLastGrindSettings } from "@/lib/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,14 +24,27 @@ import {
 } from "@/components/ui/dialog";
 import { FillVialDialog } from "@/components/fill-vial-dialog";
 import { VialHistory } from "@/components/vial-history";
-import { ArrowLeft, Printer, Coffee, Droplets, Timer, AlertTriangle, Sparkles, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Printer, Coffee, Droplets, Timer, AlertTriangle, Sparkles, CheckCircle2, Zap, ThumbsUp, Turtle, Snowflake } from "lucide-react";
 
 interface VialDetailProps {
   vialId: string;
 }
 
-// Freshness calculations
-function getFreshnessInfo(roastDate: string) {
+type BrewMethod = "espresso" | "filter";
+type BrewFeedback = "fast" | "good" | "slow";
+
+// Freshness calculations (considers frozen state)
+function getFreshnessInfo(roastDate: string, isFrozen: boolean) {
+  if (isFrozen) {
+    return {
+      label: "Frozen",
+      color: "text-blue-600 bg-blue-50",
+      icon: Snowflake,
+      message: "Freshness paused while frozen",
+      suggestion: "Thaw before brewing for best results"
+    };
+  }
+  
   const days = differenceInDays(new Date(), new Date(roastDate));
   
   if (days < 7) {
@@ -69,59 +82,151 @@ function getFreshnessInfo(roastDate: string) {
   }
 }
 
+// Grind scale configuration by brew method
+const GRIND_SCALES = {
+  espresso: {
+    min: 1,
+    max: 100,
+    default: 15,
+    unit: "espresso-scale" as const,
+    label: "Grind size",
+    helper: "Fine -> Coarse (espresso range)"
+  },
+  filter: {
+    min: 1,
+    max: 40,
+    default: 25,
+    unit: "comandante-clicks" as const,
+    label: "Grind size (Comandante clicks)",
+    helper: "Finer -> Coarser (filter range)"
+  }
+};
+
 export function VialDetail({ vialId }: VialDetailProps) {
   const { data: vial, isLoading: vialLoading } = useVial(vialId);
   const { data: activeFill } = useActiveFillSession(vialId);
   const { data: fillSessions } = useFillSessions(vialId);
   const { data: coffee } = useCoffee(activeFill?.coffeeId ?? null);
   const { data: doseTypes } = useDoseTypes();
+  
   const [showFillDialog, setShowFillDialog] = useState(false);
-  const [showUseDialog, setShowUseDialog] = useState(false);
+  const [showBrewDialog, setShowBrewDialog] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [brewType, setBrewType] = useState<string>("espresso");
-  const [grindSize, setGrindSize] = useState<number>(15);
-  const [useLoading, setUseLoading] = useState(false);
+  const [brewLoading, setBrewLoading] = useState(false);
+  const [freezeLoading, setFreezeLoading] = useState(false);
+  
+  // Brew form state
+  const [brewMethod, setBrewMethod] = useState<BrewMethod>("espresso");
+  const [grindSize, setGrindSize] = useState(15);
+  const [extractionGrams, setExtractionGrams] = useState<number>(36);
+  const [brewFeedback, setBrewFeedback] = useState<BrewFeedback>("good");
+  const [notes, setNotes] = useState("");
 
-  const doseType = doseTypes?.find((dt) => dt.id === vial?.doseTypeId);
+  // Get last grind settings for this coffee + method
+  const { data: lastGrind } = useLastGrindSettings(coffee?.id ?? null, brewMethod);
+
+  const doseType = doseTypes?.find((dt: { id: string }) => dt.id === vial?.doseTypeId);
+  const doseGrams = activeFill?.gramsPerDose ?? doseType?.gramsPerDose ?? 18;
+  const isFrozen = vial?.isFrozen ?? false;
 
   // Get freshness info
-  const freshness = activeFill ? getFreshnessInfo(activeFill.roastDate) : null;
+  const freshness = activeFill ? getFreshnessInfo(activeFill.roastDate, isFrozen) : null;
   const FreshnessIcon = freshness?.icon ?? Timer;
 
+  // Get the grind scale for current brew method
+  const grindScale = GRIND_SCALES[brewMethod];
+
+  // Update grind size when method changes or last grind is loaded
+  useEffect(() => {
+    if (lastGrind?.found) {
+      setGrindSize(lastGrind.grindSize);
+      setExtractionGrams(lastGrind.extractionGrams || (brewMethod === "espresso" ? 36 : 250));
+    } else {
+      setGrindSize(grindScale.default);
+      setExtractionGrams(brewMethod === "espresso" ? 36 : 250);
+    }
+  }, [brewMethod, lastGrind, grindScale.default]);
+
   // Determine default brew type based on vial prefix
-  const getDefaultBrewType = useCallback(() => {
+  const getDefaultBrewType = useCallback((): BrewMethod => {
     if (vial?.vialCode?.startsWith("ESP")) return "espresso";
     if (vial?.vialCode?.startsWith("FLT")) return "filter";
     return "espresso";
   }, [vial?.vialCode]);
 
-  const handleUseClick = () => {
-    setBrewType(getDefaultBrewType());
-    setGrindSize(getDefaultBrewType() === "espresso" ? 15 : 25);
-    setShowUseDialog(true);
+  const handleBrewClick = () => {
+    const defaultMethod = getDefaultBrewType();
+    setBrewMethod(defaultMethod);
+    setGrindSize(GRIND_SCALES[defaultMethod].default);
+    setExtractionGrams(defaultMethod === "espresso" ? 36 : 250);
+    setBrewFeedback("good");
+    setNotes("");
+    setShowBrewDialog(true);
   };
 
-  const handleConfirmUse = async () => {
-    if (!activeFill) return;
-    setUseLoading(true);
+  const handleFreezeToggle = async () => {
+    setFreezeLoading(true);
     try {
-      const res = await fetch(`/api/vials/${vialId}/use`, {
+      const res = await fetch(`/api/vials/${vialId}/freeze`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to toggle freeze");
+      const data = await res.json();
+      toast.success(data.isFrozen ? "Dose frozen" : "Dose unfrozen");
+      mutate(`/api/vials/${vialId}`);
+      mutate("/api/home");
+      mutate("/api/inventory");
+    } catch {
+      toast.error("Failed to toggle freeze state");
+    } finally {
+      setFreezeLoading(false);
+    }
+  };
+
+  const handleMethodChange = (method: BrewMethod) => {
+    setBrewMethod(method);
+    // Scale will be updated by useEffect when lastGrind loads
+  };
+
+  const handleConfirmBrew = async () => {
+    if (!activeFill) return;
+    setBrewLoading(true);
+    
+    try {
+      const res = await fetch("/api/brew", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brewType, grindSize }),
+        body: JSON.stringify({
+          doseId: vialId,
+          brewMethod,
+          doseGrams,
+          grindSize,
+          extractionGrams,
+          brewFeedback,
+          notes: notes.trim() || null,
+        }),
       });
-      if (!res.ok) throw new Error("Failed");
-      setShowUseDialog(false);
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to log brew");
+      }
+      
+      setShowBrewDialog(false);
       setShowConfirmation(true);
+      
+      // Refresh all relevant data
       mutate(`/api/vials/${vialId}`);
       mutate(`/api/vials/${vialId}/fill-sessions`);
       mutate("/api/inventory");
       mutate("/api/vials");
-      mutate("/api/activity");
-    } catch {
-      toast.error("Failed to mark dose as brewed");
+      mutate("/api/brew");
+      mutate("/api/home");
+      
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to log brew");
     } finally {
-      setUseLoading(false);
+      setBrewLoading(false);
     }
   };
 
@@ -165,19 +270,23 @@ export function VialDetail({ vialId }: VialDetailProps) {
             {vial.vialCode}
           </h1>
           <p className="text-xs text-muted-foreground">
-            {doseType?.name} ({activeFill?.gramsPerDose ?? doseType?.gramsPerDose}g)
+            {doseType?.name} ({doseGrams}g)
           </p>
         </div>
-        <Badge
-          variant={isFull ? "default" : "outline"}
-          className={
-            isFull
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground"
-          }
-        >
-          {vial.status === "FULL" ? "Sealed" : "Brewed"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {isFrozen && (
+            <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50">
+              <Snowflake className="size-3 mr-1" />
+              Frozen
+            </Badge>
+          )}
+          <Badge
+            variant={isFull ? "default" : "outline"}
+            className={isFull ? "bg-primary text-primary-foreground" : "text-muted-foreground"}
+          >
+            {vial.status === "FULL" ? "Sealed" : "Brewed"}
+          </Badge>
+        </div>
         <Link href={`/vials/${vialId}/label`}>
           <Button variant="outline" size="icon-sm">
             <Printer className="size-4" />
@@ -226,66 +335,60 @@ export function VialDetail({ vialId }: VialDetailProps) {
                 {coffee.producer && (
                   <div>
                     <span className="text-muted-foreground">Producer</span>
-                    <p className="font-medium text-foreground">
-                      {coffee.producer}
-                    </p>
+                    <p className="font-medium text-foreground">{coffee.producer}</p>
                   </div>
                 )}
                 {coffee.variety && (
                   <div>
                     <span className="text-muted-foreground">Variety</span>
-                    <p className="font-medium text-foreground">
-                      {coffee.variety}
-                    </p>
+                    <p className="font-medium text-foreground">{coffee.variety}</p>
                   </div>
                 )}
                 {coffee.altitude && (
                   <div>
                     <span className="text-muted-foreground">Altitude</span>
-                    <p className="font-medium text-foreground">
-                      {coffee.altitude}
-                    </p>
+                    <p className="font-medium text-foreground">{coffee.altitude}</p>
                   </div>
                 )}
               </div>
               {activeFill && (
                 <div className="mt-2 border-t border-border pt-2 flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">
-                    Roast date:{" "}
-                    {format(new Date(activeFill.roastDate), "MMM d, yyyy")}
+                    Roast date: {format(new Date(activeFill.roastDate), "MMM d, yyyy")}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    Dose: <span className="font-medium text-foreground">{activeFill.gramsPerDose}g</span>
+                    Dose: <span className="font-medium text-foreground">{doseGrams}g</span>
                   </span>
                 </div>
               )}
               {coffee.tastingNotes && (
                 <div className="mt-1">
-                  <span className="text-xs text-muted-foreground">
-                    Tasting notes
-                  </span>
-                  <p className="text-sm text-foreground">
-                    {coffee.tastingNotes}
-                  </p>
-                </div>
-              )}
-              {coffee.notes && (
-                <div className="mt-1">
-                  <span className="text-xs text-muted-foreground">Notes</span>
-                  <p className="text-sm text-foreground">{coffee.notes}</p>
+                  <span className="text-xs text-muted-foreground">Tasting notes</span>
+                  <p className="text-sm text-foreground">{coffee.tastingNotes}</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
           <Button
-            onClick={handleUseClick}
-            disabled={useLoading}
+            onClick={handleBrewClick}
+            disabled={brewLoading}
             className="h-14 w-full gap-3 text-base font-bold bg-accent text-accent-foreground hover:bg-accent/90"
             size="lg"
           >
             <Droplets className="size-5" />
             Brew my dose
+          </Button>
+
+          {/* Freeze/Unfreeze Button */}
+          <Button
+            variant="outline"
+            onClick={handleFreezeToggle}
+            disabled={freezeLoading}
+            className={`w-full gap-2 ${isFrozen ? "border-blue-300 text-blue-600 hover:bg-blue-50" : ""}`}
+          >
+            <Snowflake className="size-4" />
+            {freezeLoading ? "Updating..." : isFrozen ? "Unfreeze dose" : "Freeze dose"}
           </Button>
         </>
       ) : (
@@ -309,9 +412,7 @@ export function VialDetail({ vialId }: VialDetailProps) {
 
       {fillSessions && fillSessions.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-foreground">
-            History
-          </h2>
+          <h2 className="mb-2 text-sm font-semibold text-foreground">History</h2>
           <VialHistory sessions={fillSessions} />
         </section>
       )}
@@ -324,32 +425,37 @@ export function VialDetail({ vialId }: VialDetailProps) {
         hasActiveFill={!!activeFill}
       />
 
-      {/* Brew Notes Dialog */}
-      <Dialog open={showUseDialog} onOpenChange={setShowUseDialog}>
-        <DialogContent className="max-w-sm">
+      {/* Brew Logging Dialog */}
+      <Dialog open={showBrewDialog} onOpenChange={setShowBrewDialog}>
+        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Log Your Brew</DialogTitle>
             <DialogDescription>
-              Record your brew method and grind settings
+              Record your brew details for tracking and dialing in
             </DialogDescription>
           </DialogHeader>
+          
           <div className="flex flex-col gap-5 py-4">
+            {/* Brew Method - Required */}
             <div>
-              <Label className="text-sm font-medium mb-2 block">Brew Method</Label>
-              <RadioGroup value={brewType} onValueChange={(v) => {
-                setBrewType(v);
-                setGrindSize(v === "espresso" ? 15 : 25);
-              }} className="gap-3">
-                <div className="flex items-center space-x-3 rounded-lg border border-border p-3 hover:bg-secondary/50 cursor-pointer">
-                  <RadioGroupItem value="espresso" id="espresso" />
-                  <Label htmlFor="espresso" className="flex-1 cursor-pointer">
+              <Label className="text-sm font-medium mb-2 block">
+                Brew Method <span className="text-destructive">*</span>
+              </Label>
+              <RadioGroup 
+                value={brewMethod} 
+                onValueChange={(v) => handleMethodChange(v as BrewMethod)} 
+                className="gap-3"
+              >
+                <div className={`flex items-center space-x-3 rounded-lg border p-3 cursor-pointer transition-colors ${brewMethod === "espresso" ? "border-primary bg-primary/5" : "border-border hover:bg-secondary/50"}`}>
+                  <RadioGroupItem value="espresso" id="brew-espresso" />
+                  <Label htmlFor="brew-espresso" className="flex-1 cursor-pointer">
                     <span className="font-medium">Espresso</span>
                     <p className="text-xs text-muted-foreground">Pressure brewed, concentrated shot</p>
                   </Label>
                 </div>
-                <div className="flex items-center space-x-3 rounded-lg border border-border p-3 hover:bg-secondary/50 cursor-pointer">
-                  <RadioGroupItem value="filter" id="filter" />
-                  <Label htmlFor="filter" className="flex-1 cursor-pointer">
+                <div className={`flex items-center space-x-3 rounded-lg border p-3 cursor-pointer transition-colors ${brewMethod === "filter" ? "border-primary bg-primary/5" : "border-border hover:bg-secondary/50"}`}>
+                  <RadioGroupItem value="filter" id="brew-filter" />
+                  <Label htmlFor="brew-filter" className="flex-1 cursor-pointer">
                     <span className="font-medium">Filter</span>
                     <p className="text-xs text-muted-foreground">Pour-over, drip, or immersion brew</p>
                   </Label>
@@ -357,41 +463,128 @@ export function VialDetail({ vialId }: VialDetailProps) {
               </RadioGroup>
             </div>
 
+            {/* Grind Size - Method-aware, Required */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label className="text-sm font-medium">Grind Size</Label>
+                <Label className="text-sm font-medium">
+                  {grindScale.label} <span className="text-destructive">*</span>
+                </Label>
                 <div className="flex items-center gap-2">
                   <Input
                     type="number"
                     value={grindSize}
-                    onChange={(e) => setGrindSize(Number(e.target.value))}
+                    onChange={(e) => setGrindSize(Math.min(grindScale.max, Math.max(grindScale.min, Number(e.target.value))))}
                     className="w-16 h-8 text-center text-sm"
-                    min={1}
-                    max={50}
+                    min={grindScale.min}
+                    max={grindScale.max}
                   />
-                  <span className="text-xs text-muted-foreground">clicks</span>
                 </div>
               </div>
               <Slider
                 value={[grindSize]}
                 onValueChange={([v]) => setGrindSize(v)}
-                min={1}
-                max={50}
+                min={grindScale.min}
+                max={grindScale.max}
                 step={1}
                 className="mt-2"
               />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Fine (espresso)</span>
-                <span>Coarse (filter)</span>
+              <p className="text-xs text-muted-foreground mt-1">{grindScale.helper}</p>
+              {lastGrind?.found && (
+                <p className="text-xs text-primary mt-1">
+                  Last used: {lastGrind.grindSize} for this coffee
+                </p>
+              )}
+            </div>
+
+            {/* Extraction Yield - Required */}
+            <div>
+              <Label htmlFor="extraction" className="text-sm font-medium mb-2 block">
+                Extraction (g) <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="extraction"
+                type="number"
+                value={extractionGrams}
+                onChange={(e) => setExtractionGrams(Number(e.target.value))}
+                className="w-full"
+                min={0}
+                step={0.1}
+                placeholder={brewMethod === "espresso" ? "36" : "250"}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Beverage weight after brewing
+              </p>
+            </div>
+
+            {/* Brew Feedback - Required */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                How was the extraction? <span className="text-destructive">*</span>
+              </Label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBrewFeedback("fast")}
+                  className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-colors ${
+                    brewFeedback === "fast" 
+                      ? "border-amber-500 bg-amber-50 text-amber-700" 
+                      : "border-border hover:bg-secondary/50"
+                  }`}
+                >
+                  <Zap className="size-5" />
+                  <span className="text-xs font-medium">Too fast</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBrewFeedback("good")}
+                  className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-colors ${
+                    brewFeedback === "good" 
+                      ? "border-green-500 bg-green-50 text-green-700" 
+                      : "border-border hover:bg-secondary/50"
+                  }`}
+                >
+                  <ThumbsUp className="size-5" />
+                  <span className="text-xs font-medium">Just right</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBrewFeedback("slow")}
+                  className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-colors ${
+                    brewFeedback === "slow" 
+                      ? "border-blue-500 bg-blue-50 text-blue-700" 
+                      : "border-border hover:bg-secondary/50"
+                  }`}
+                >
+                  <Turtle className="size-5" />
+                  <span className="text-xs font-medium">Too slow</span>
+                </button>
               </div>
             </div>
+
+            {/* Notes - Optional */}
+            <div>
+              <Label htmlFor="notes" className="text-sm font-medium mb-2 block">
+                Notes (optional)
+              </Label>
+              <Input
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Tasting notes, adjustments..."
+                className="w-full"
+              />
+            </div>
           </div>
+          
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUseDialog(false)}>
+            <Button variant="outline" onClick={() => setShowBrewDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmUse} disabled={useLoading}>
-              {useLoading ? "Logging..." : "Confirm Brew"}
+            <Button 
+              onClick={handleConfirmBrew} 
+              disabled={brewLoading || !extractionGrams}
+            >
+              {brewLoading ? "Logging..." : "Confirm Brew"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -407,13 +600,26 @@ export function VialDetail({ vialId }: VialDetailProps) {
             <div>
               <h2 className="text-lg font-bold text-foreground">Enjoy your brew!</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {brewType === "espresso" ? "Espresso" : "Filter"} logged with grind size {grindSize}
+                {brewMethod === "espresso" ? "Espresso" : "Filter"} logged
               </p>
             </div>
             {coffee && (
-              <div className="w-full p-3 bg-secondary/50 rounded-lg">
+              <div className="w-full p-3 bg-secondary/50 rounded-lg text-left">
                 <p className="font-medium text-foreground">{coffee.coffeeName}</p>
                 <p className="text-xs text-muted-foreground">{coffee.roaster}</p>
+                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                  <span>Grind: {grindSize}</span>
+                  <span>Yield: {extractionGrams}g</span>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${
+                      brewFeedback === "good" ? "text-green-600" : 
+                      brewFeedback === "fast" ? "text-amber-600" : "text-blue-600"
+                    }`}
+                  >
+                    {brewFeedback === "good" ? "Just right" : brewFeedback === "fast" ? "Too fast" : "Too slow"}
+                  </Badge>
+                </div>
               </div>
             )}
             <Button onClick={() => setShowConfirmation(false)} className="w-full">

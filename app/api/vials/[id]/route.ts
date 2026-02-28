@@ -19,6 +19,8 @@ export async function GET(
     qrValue: r.qr_value,
     createdAt: r.created_at,
     status: r.status,
+    isFrozen: r.is_frozen ?? false,
+    frozenAt: r.frozen_at ?? null,
   });
 }
 

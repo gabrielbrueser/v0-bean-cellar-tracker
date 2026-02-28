@@ -14,6 +14,8 @@ export interface Vial {
   status: "FULL" | "EMPTY";
   color: string | null;
   archived: boolean;
+  isFrozen: boolean;
+  frozenAt: Date | null;
 }
 
 export interface Coffee {
@@ -60,6 +62,27 @@ export interface UsageLog {
   brewMethod: string;
   grindSize?: number | null;
   notes: string;
+}
+
+export interface BrewLog {
+  id: string;
+  userId: string | null;
+  cellarId: string | null;
+  coffeeId: string;
+  doseId: string;
+  brewMethod: "espresso" | "filter";
+  doseGrams: number;
+  grindSize: number;
+  grindUnit: "espresso-scale" | "comandante-clicks";
+  extractionGrams: number;
+  brewFeedback: "fast" | "good" | "slow";
+  notes: string | null;
+  createdAt: Date;
+  // Joined fields
+  coffeeName?: string;
+  roaster?: string;
+  vialCode?: string;
+  userName?: string;
 }
 
 export interface InventoryGroup {

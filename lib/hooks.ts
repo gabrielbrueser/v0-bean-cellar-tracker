@@ -75,3 +75,15 @@ export function useCellars() {
 export function useCellarInvites(cellarId: string | null) {
   return useSWR(cellarId ? `/api/cellars/${cellarId}/invites` : null, fetcher);
 }
+
+export function useBrewLogs(limit?: number) {
+  const url = limit ? `/api/brew?limit=${limit}` : "/api/brew";
+  return useSWR(url, fetcher);
+}
+
+export function useLastGrindSettings(coffeeId: string | null, brewMethod: string | null) {
+  return useSWR(
+    coffeeId && brewMethod ? `/api/brew/last-grind?coffeeId=${coffeeId}&brewMethod=${brewMethod}` : null,
+    fetcher
+  );
+}
