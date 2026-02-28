@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     FROM brew_logs bl
     JOIN coffees c ON c.id = bl.coffee_id
     LEFT JOIN vials v ON v.id = bl.dose_id
-    WHERE bl.cellar_id = ${cellarId} AND bl.deleted_at IS NULL
+    WHERE bl.cellar_id = ${cellarId}::uuid AND bl.deleted_at IS NULL
     ORDER BY bl.created_at DESC
     LIMIT 1
   `;
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     JOIN vials v ON v.id = fs.vial_id
     JOIN coffees c ON c.id = fs.coffee_id
     WHERE fs.status = 'FULL'
-      AND c.cellar_id = ${cellarId}
+      AND c.cellar_id = ${cellarId}::uuid
       AND v.is_frozen = false
       AND EXTRACT(DAY FROM NOW() - fs.roast_date) BETWEEN 7 AND 21
   `;
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     FROM fill_sessions fs
     JOIN vials v ON v.id = fs.vial_id
     JOIN coffees c ON c.id = fs.coffee_id
-    WHERE fs.status = 'FULL' AND v.is_frozen = true AND c.cellar_id = ${cellarId}
+    WHERE fs.status = 'FULL' AND v.is_frozen = true AND c.cellar_id = ${cellarId}::uuid
   `;
 
   // Get hero recommendations - one per method (espresso/filter)
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
     JOIN coffees c ON c.id = fs.coffee_id
     JOIN dose_types dt ON dt.id = fs.dose_type_id
     WHERE fs.status = 'FULL'
-      AND c.cellar_id = ${cellarId}
+      AND c.cellar_id = ${cellarId}::uuid
       AND dt.prefix IN ('ESP', 'espresso')
       AND EXTRACT(DAY FROM NOW() - fs.roast_date) <= 35
     ORDER BY
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
     JOIN coffees c ON c.id = fs.coffee_id
     JOIN dose_types dt ON dt.id = fs.dose_type_id
     WHERE fs.status = 'FULL'
-      AND c.cellar_id = ${cellarId}
+      AND c.cellar_id = ${cellarId}::uuid
       AND dt.prefix IN ('FLT', 'filter')
       AND EXTRACT(DAY FROM NOW() - fs.roast_date) <= 35
     ORDER BY
@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
     JOIN vials v ON v.id = fs.vial_id
     JOIN coffees c ON c.id = fs.coffee_id
     JOIN dose_types dt ON dt.id = fs.dose_type_id
-    WHERE fs.status = 'FULL' AND v.is_frozen = true AND c.cellar_id = ${cellarId}
+    WHERE fs.status = 'FULL' AND v.is_frozen = true AND c.cellar_id = ${cellarId}::uuid
     ORDER BY v.frozen_at DESC
     LIMIT 3
   `;
@@ -160,7 +160,7 @@ export async function GET(req: NextRequest) {
     JOIN coffees c ON c.id = fs.coffee_id
     JOIN dose_types dt ON dt.id = fs.dose_type_id
     WHERE fs.status = 'FULL'
-      AND c.cellar_id = ${cellarId}
+      AND c.cellar_id = ${cellarId}::uuid
       AND v.is_frozen = false
       AND EXTRACT(DAY FROM NOW() - fs.roast_date) BETWEEN 32 AND 35
     ORDER BY c.coffee_name, dt.name
@@ -173,7 +173,7 @@ export async function GET(req: NextRequest) {
       COALESCE(SUM(dose_grams), 0)::numeric as grams
     FROM brew_logs
     WHERE created_at > NOW() - INTERVAL '7 days' 
-      AND cellar_id = ${cellarId}
+      AND cellar_id = ${cellarId}::uuid
       AND deleted_at IS NULL
   `;
 
@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
       COALESCE(SUM(dose_grams), 0)::numeric as grams
     FROM brew_logs
     WHERE created_at >= DATE_TRUNC('month', NOW()) 
-      AND cellar_id = ${cellarId}
+      AND cellar_id = ${cellarId}::uuid
       AND deleted_at IS NULL
   `;
 
