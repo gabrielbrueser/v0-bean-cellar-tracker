@@ -111,7 +111,15 @@ export async function GET(req: Request) {
   const cellarId = searchParams.get("cellarId");
   const sql = getDb();
 
-  const rows = cellarId ? await sql`
+  // REQUIRE cellarId to prevent returning all data
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
+
+  const rows = await sql`
     SELECT
       bl.id,
       bl.user_id,
@@ -138,33 +146,6 @@ export async function GET(req: Request) {
     WHERE bl.cellar_id = ${cellarId} AND bl.deleted_at IS NULL
     ORDER BY bl.created_at DESC
     LIMIT ${limit}
-  ` : await sql`
-    SELECT
-      bl.id,
-      bl.user_id,
-      bl.cellar_id,
-      bl.coffee_id,
-      bl.dose_id,
-      bl.brew_method,
-      bl.dose_grams,
-      bl.grind_size,
-      bl.grind_unit,
-      bl.extraction_grams,
-      bl.brew_feedback,
-      bl.notes,
-      bl.created_at,
-      c.coffee_name,
-      c.roaster,
-      v.vial_code,
-      u.name as user_name,
-      u.email as user_email
-    FROM brew_logs bl
-    JOIN coffees c ON c.id = bl.coffee_id
-    JOIN vials v ON v.id = bl.dose_id
-    LEFT JOIN users u ON u.id = bl.user_id
-    WHERE bl.deleted_at IS NULL
-    ORDER BY bl.created_at DESC
-    LIMIT ${limit}
   `;
 
   const brewLogs = rows.map((r) => ({
@@ -187,5 +168,9 @@ export async function GET(req: Request) {
     userName: r.user_name || r.user_email?.split("@")[0] || null,
   }));
 
-  return NextResponse.json(brewLogs);
+  return NextResponse.json(brewLogs, {
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
 }

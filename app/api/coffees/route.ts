@@ -7,8 +7,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const cellarId = searchParams.get("cellarId");
   
+  // REQUIRE cellarId to prevent returning all coffees
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
+  
   // Get coffees with last brewed date and total brews, filtered by cellar (exclude deleted brews)
-  const rows = cellarId ? await sql`
+  const rows = await sql`
     SELECT 
       c.*,
       (SELECT MAX(bl.created_at) FROM brew_logs bl WHERE bl.coffee_id = c.id AND bl.deleted_at IS NULL) as last_brewed,
@@ -16,14 +24,6 @@ export async function GET(req: NextRequest) {
       (SELECT fs.roast_date FROM fill_sessions fs WHERE fs.coffee_id = c.id ORDER BY fs.created_at DESC LIMIT 1) as last_roast_date
     FROM coffees c
     WHERE c.cellar_id = ${cellarId}
-    ORDER BY c.created_at DESC
-  ` : await sql`
-    SELECT 
-      c.*,
-      (SELECT MAX(bl.created_at) FROM brew_logs bl WHERE bl.coffee_id = c.id AND bl.deleted_at IS NULL) as last_brewed,
-      (SELECT COUNT(*)::int FROM brew_logs bl WHERE bl.coffee_id = c.id AND bl.deleted_at IS NULL) as total_brews,
-      (SELECT fs.roast_date FROM fill_sessions fs WHERE fs.coffee_id = c.id ORDER BY fs.created_at DESC LIMIT 1) as last_roast_date
-    FROM coffees c
     ORDER BY c.created_at DESC
   `;
   
@@ -49,7 +49,11 @@ export async function GET(req: NextRequest) {
     lastRoastDate: r.last_roast_date,
   }));
   
-  return NextResponse.json(coffees);
+  return NextResponse.json(coffees, {
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
 }
 
 // POST /api/coffees
