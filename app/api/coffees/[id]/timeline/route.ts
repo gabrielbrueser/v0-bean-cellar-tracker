@@ -1,13 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { requireCellarId } from "@/lib/api/cellar";
 
 // GET /api/coffees/:id/timeline - Get brew history and stats for a coffee
 export async function GET(
-  _req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let cellarId: string;
+  try {
+    cellarId = requireCellarId(req);
+  } catch (response) {
+    return response as NextResponse;
+  }
+  
   const { id: coffeeId } = await params;
   const sql = getDb();
+
+  // Verify coffee belongs to this cellar
+  const coffeeCheck = await sql`
+    SELECT id FROM coffees WHERE id = ${coffeeId} AND cellar_id = ${cellarId}
+  `;
+  if (coffeeCheck.length === 0) {
+    return NextResponse.json(
+      { error: "Coffee not found in this cellar" },
+      { status: 404 }
+    );
+  }
 
   // Get all brew logs for this coffee with fill session info
   const brews = await sql`
@@ -76,5 +95,7 @@ export async function GET(
       maxGrind: g.max_grind,
       count: Number(g.count),
     })),
+  }, {
+    headers: { "Cache-Control": "no-store, max-age=0" },
   });
 }

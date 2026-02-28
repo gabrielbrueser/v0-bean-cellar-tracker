@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useVial } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QRCodeSVG, getVialQRUrl } from "@/components/qr-code";
@@ -12,7 +13,8 @@ interface VialLabelProps {
 }
 
 export function VialLabel({ vialId }: VialLabelProps) {
-  const { data: vial, isLoading } = useVial(vialId);
+  const { currentCellar } = useCellarContext();
+  const { data: vial, isLoading } = useVial(vialId, currentCellar?.id);
 
   const handlePrint = () => {
     window.print();

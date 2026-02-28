@@ -157,23 +157,9 @@ export default function HomePage() {
 
   const greeting = getGreeting();
   const isLateNight = greeting === "Late night brew?";
-
-  // Compute the actual SWR key being used
-  const swrKey = currentCellar?.id ? `/api/home?cellarId=${currentCellar.id}` : null;
   
   return (
   <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
-  {/* DEV DEBUG PANEL - Remove after debugging */}
-  {process.env.NODE_ENV !== "production" && (
-    <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-xs font-mono">
-      <div className="font-bold text-yellow-800 mb-1">DEBUG (Home Page)</div>
-      <div>cellar.id: <span className="text-blue-600">{currentCellar?.id || "NULL"}</span></div>
-      <div>cellar.name: <span className="text-blue-600">{currentCellar?.name || "NULL"}</span></div>
-      <div>cellarLoading: <span className="text-blue-600">{String(cellarLoading)}</span></div>
-      <div>SWR key: <span className="text-blue-600">{swrKey || "NULL"}</span></div>
-      <div>homeLoading: <span className="text-blue-600">{String(homeLoading)}</span></div>
-    </div>
-  )}
   {/* Header with time-aware greeting */}
   <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
