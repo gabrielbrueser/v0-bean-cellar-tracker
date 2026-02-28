@@ -13,38 +13,44 @@ export async function GET(
   } catch (response) {
     return response as NextResponse;
   }
-  
+
   const { id } = await params;
   const sql = getDb();
-  
-  // Only return coffee if it belongs to the specified cellar
-  const rows = await sql`SELECT * FROM coffees WHERE id = ${id} AND cellar_id = ${cellarId}`;
-  if (rows.length === 0) {
-    return NextResponse.json(
-      { error: "Coffee not found in this cellar" },
-      { status: 404 }
-    );
+
+  try {
+    // Added ::uuid casting to both ID and cellar_id
+    const rows = await sql`SELECT * FROM coffees WHERE id = ${id}::uuid AND cellar_id = ${cellarId}::uuid`;
+
+    if (rows.length === 0) {
+      return NextResponse.json(
+        { error: "Coffee not found in this cellar" },
+        { status: 404 }
+      );
+    }
+    const r = rows[0];
+    return NextResponse.json({
+      id: r.id,
+      roaster: r.roaster,
+      coffeeName: r.coffee_name,
+      score: r.score,
+      origin: r.origin,
+      originCountry: r.origin_country,
+      producer: r.producer,
+      variety: r.variety,
+      altitude: r.altitude,
+      tastingNotes: r.tasting_notes,
+      notes: r.notes,
+      link: r.link,
+      processMethodId: r.process_method_id,
+      color: r.color,
+      archived: r.archived ?? false,
+      createdAt: r.created_at,
+      cellarId: r.cellar_id,
+    });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Database type mismatch" }, { status: 500 });
   }
-  const r = rows[0];
-  return NextResponse.json({
-    id: r.id,
-    roaster: r.roaster,
-    coffeeName: r.coffee_name,
-    score: r.score,
-    origin: r.origin,
-    originCountry: r.origin_country,
-    producer: r.producer,
-    variety: r.variety,
-    altitude: r.altitude,
-    tastingNotes: r.tasting_notes,
-    notes: r.notes,
-    link: r.link,
-    processMethodId: r.process_method_id,
-    color: r.color,
-    archived: r.archived ?? false,
-    createdAt: r.created_at,
-    cellarId: r.cellar_id,
-  });
 }
 
 // PUT /api/coffees/:id
@@ -58,61 +64,43 @@ export async function PUT(
   } catch (response) {
     return response as NextResponse;
   }
-  
+
   const { id } = await params;
   const body = await req.json();
   const sql = getDb();
-  
-  // Only update if coffee belongs to this cellar
-  const rows = await sql`
-    UPDATE coffees SET
-      roaster = ${body.roaster},
-      coffee_name = ${body.coffeeName},
-      score = ${body.score || 0},
-      origin = ${body.origin},
-      origin_country = ${body.originCountry || null},
-      producer = ${body.producer || ""},
-      variety = ${body.variety || ""},
-      altitude = ${body.altitude || ""},
-      tasting_notes = ${body.tastingNotes || ""},
-      notes = ${body.notes || ""},
-      link = ${body.link || ""},
-      process_method_id = ${body.processMethodId || null},
-      color = ${body.color || null}
-    WHERE id = ${id} AND cellar_id = ${cellarId}
-    RETURNING *
-  `;
-  
-  if (rows.length === 0) {
-    return NextResponse.json(
-      { error: "Coffee not found in this cellar" },
-      { status: 404 }
-    );
+
+  try {
+    const rows = await sql`
+      UPDATE coffees SET
+        roaster = ${body.roaster},
+        coffee_name = ${body.coffeeName},
+        score = ${body.score || 0},
+        origin = ${body.origin},
+        origin_country = ${body.originCountry || null},
+        producer = ${body.producer || ""},
+        variety = ${body.variety || ""},
+        altitude = ${body.altitude || ""},
+        tasting_notes = ${body.tastingNotes || ""},
+        notes = ${body.notes || ""},
+        link = ${body.link || ""},
+        process_method_id = ${body.processMethodId || null},
+        color = ${body.color || null}
+      WHERE id = ${id}::uuid AND cellar_id = ${cellarId}::uuid
+      RETURNING *
+    `;
+
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "Coffee not found" }, { status: 404 });
+    }
+
+    const r = rows[0];
+    return NextResponse.json(r);
+  } catch (err) {
+    return NextResponse.json({ error: "Update failed" }, { status: 500 });
   }
-  
-  const r = rows[0];
-  return NextResponse.json({
-    id: r.id,
-    roaster: r.roaster,
-    coffeeName: r.coffee_name,
-    score: r.score,
-    origin: r.origin,
-    originCountry: r.origin_country,
-    producer: r.producer,
-    variety: r.variety,
-    altitude: r.altitude,
-    tastingNotes: r.tasting_notes,
-    notes: r.notes,
-    link: r.link,
-    processMethodId: r.process_method_id,
-    color: r.color,
-    archived: r.archived ?? false,
-    createdAt: r.created_at,
-    cellarId: r.cellar_id,
-  });
 }
 
-// PATCH /api/coffees/:id — archive/unarchive
+// PATCH /api/coffees/:id
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -123,26 +111,21 @@ export async function PATCH(
   } catch (response) {
     return response as NextResponse;
   }
-  
+
   const { id } = await params;
   const body = await req.json();
   const sql = getDb();
-  
+
   if (body.archived !== undefined) {
     const result = await sql`
       UPDATE coffees SET archived = ${body.archived} 
-      WHERE id = ${id} AND cellar_id = ${cellarId}
+      WHERE id = ${id}::uuid AND cellar_id = ${cellarId}::uuid
       RETURNING id
     `;
-    if (result.length === 0) {
-      return NextResponse.json(
-        { error: "Coffee not found in this cellar" },
-        { status: 404 }
-      );
-    }
+    if (result.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ ok: true });
   }
-  
+
   return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 }
 
@@ -157,22 +140,16 @@ export async function DELETE(
   } catch (response) {
     return response as NextResponse;
   }
-  
+
   const { id } = await params;
   const sql = getDb();
-  
+
   const result = await sql`
     DELETE FROM coffees 
-    WHERE id = ${id} AND cellar_id = ${cellarId}
+    WHERE id = ${id}::uuid AND cellar_id = ${cellarId}::uuid
     RETURNING id
   `;
-  
-  if (result.length === 0) {
-    return NextResponse.json(
-      { error: "Coffee not found in this cellar" },
-      { status: 404 }
-    );
-  }
-  
+
+  if (result.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }
