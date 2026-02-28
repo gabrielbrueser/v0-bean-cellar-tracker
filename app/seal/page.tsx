@@ -351,7 +351,7 @@ export default function SealCoffeePage() {
                     </CardContent>
                   </Card>
                 );
-              })}
+              })
             )}
           </div>
 
