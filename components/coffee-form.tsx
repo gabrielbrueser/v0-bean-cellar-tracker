@@ -160,7 +160,8 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
     setLoading(true);
     try {
       if (coffee) {
-        const res = await fetch(`/api/coffees/${coffee.id}`, {
+        // PUT also requires cellarId in query param for scoping
+        const res = await fetch(`/api/coffees/${coffee.id}?cellarId=${currentCellar.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
@@ -170,8 +171,9 @@ export function CoffeeForm({ coffee, onSave, onCancel }: CoffeeFormProps) {
           throw new Error(err.error || "Failed to update coffee");
         }
         const updated = await res.json();
-        // Mutate the correct SWR key
+        // Mutate the correct SWR keys
         mutate(`/api/coffees?cellarId=${currentCellar.id}`);
+        mutate(`/api/coffees/${coffee.id}?cellarId=${currentCellar.id}`);
         onSave(updated);
         toast.success("Coffee updated");
       } else {

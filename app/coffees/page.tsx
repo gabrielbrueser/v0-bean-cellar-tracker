@@ -66,12 +66,15 @@ interface CoffeeItem {
 export default function CoffeesPage() {
   const { currentCellar, isLoading: cellarLoading } = useCellarContext();
   // Only fetch coffees when we have a cellarId to prevent cache key mismatches
-  const { data: coffees, isLoading: coffeesLoading, mutate: mutateCoffees } = useCoffees(currentCellar?.id);
+  const { data: coffees, isLoading: coffeesLoading, error: coffeesError, mutate: mutateCoffees } = useCoffees(currentCellar?.id);
   const { data: processMethods } = useProcessMethods();
   const { data: doseTypes } = useDoseTypes();
   
   // Combined loading state: loading if cellar is loading OR (we have a cellar but coffees are still loading)
   const isLoading = cellarLoading || (currentCellar?.id && coffeesLoading);
+  
+  // Compute actual SWR key for debugging
+  const swrKey = currentCellar?.id ? `/api/coffees?cellarId=${currentCellar.id}` : null;
   
   const [showCreate, setShowCreate] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -135,21 +138,49 @@ export default function CoffeesPage() {
   };
 
   const handleArchive = async (id: string, archive: boolean) => {
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
     try {
-      await fetch(`/api/coffees/${id}`, {
+      const res = await fetch(`/api/coffees/${id}?cellarId=${currentCellar.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archived: archive }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update coffee");
+      }
       mutateCoffees();
       toast.success(archive ? "Coffee archived" : "Coffee restored");
-    } catch {
-      toast.error("Failed to update coffee");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update coffee");
     }
   };
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
+      {/* TEMP DEBUG - Remove after verification */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs font-mono">
+          <div className="font-bold text-yellow-800">DEBUG INFO</div>
+          <div>cellarId: {currentCellar?.id || "NULL"}</div>
+          <div>cellarName: {currentCellar?.name || "NULL"}</div>
+          <div>cellarLoading: {String(cellarLoading)}</div>
+          <div>swrKey: {swrKey || "NULL"}</div>
+          <div>coffeesLoading: {String(coffeesLoading)}</div>
+          <div>coffees.length: {coffees?.length ?? "undefined"}</div>
+        </div>
+      )}
+      
+      {/* Error Banner */}
+      {coffeesError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+          <span className="font-medium">Error loading coffees:</span> {coffeesError.message}
+        </div>
+      )}
+      
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
