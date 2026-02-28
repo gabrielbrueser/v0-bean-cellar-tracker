@@ -1,105 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { requireCellarId } from "@/lib/api/cellar";
-
-interface Dose {
-  id: string;
-  vialCode: string;
-  doseTypeId: string;
-  isFrozen: boolean;
-  frozenAt: string | null;
-  sealedAt: string;
-}
-
-interface InventoryGroup {
-  coffeeId: string;
-  coffeeName: string;
-  roaster: string;
-  doseTypeId: string;
-  doseTypeName: string;
-  gramsPerDose: number;
-  isFrozen: boolean;
-  roastDate: string | null;
-  count: number;
-  doses: Dose[];
-}
 
 export async function GET(req: NextRequest) {
-  let cellarId: string;
-  try {
-    cellarId = requireCellarId(req);
-  } catch (response) {
-    return response as NextResponse;
-  }
-
   const sql = getDb();
-
-  try {
-    // Get all FULL vials with their fill session and coffee info
-    const rows = await sql`
-      SELECT 
-        v.id as vial_id,
-        v.vial_code,
-        v.dose_type_id,
-        v.is_frozen,
-        v.frozen_at,
-        fs.sealed_at,
-        fs.roast_date,
-        fs.coffee_id,
-        c.coffee_name,
-        c.roaster,
-        dt.name as dose_type_name,
-        dt.grams_per_dose
-      FROM vials v
-      JOIN fill_sessions fs ON fs.vial_id = v.id AND fs.status = 'FULL'
-      JOIN coffees c ON c.id = fs.coffee_id
-      JOIN dose_types dt ON dt.id = v.dose_type_id
-      WHERE v.cellar_id = ${cellarId}::uuid
-        AND v.status = 'FULL'
-      ORDER BY fs.sealed_at ASC
-    `;
-
-    // Group by coffee + dose type + frozen status
-    const groupMap = new Map<string, InventoryGroup>();
-    
-    for (const row of rows) {
-      const key = `${row.coffee_id}|${row.dose_type_id}|${row.is_frozen}`;
-      
-      if (!groupMap.has(key)) {
-        groupMap.set(key, {
-          coffeeId: row.coffee_id,
-          coffeeName: row.coffee_name,
-          roaster: row.roaster,
-          doseTypeId: row.dose_type_id,
-          doseTypeName: row.dose_type_name,
-          gramsPerDose: Number(row.grams_per_dose),
-          isFrozen: row.is_frozen,
-          roastDate: row.roast_date ? row.roast_date.toISOString().split('T')[0] : null,
-          count: 0,
-          doses: [],
-        });
-      }
-      
-      const group = groupMap.get(key)!;
-      group.count++;
-      group.doses.push({
-        id: row.vial_id,
-        vialCode: row.vial_code,
-        doseTypeId: row.dose_type_id,
-        isFrozen: row.is_frozen,
-        frozenAt: row.frozen_at ? row.frozen_at.toISOString() : null,
-        sealedAt: row.sealed_at ? row.sealed_at.toISOString() : new Date().toISOString(),
-      });
-    }
-
-    // Convert to array and sort by count descending
-    const groups = Array.from(groupMap.values()).sort((a, b) => b.count - a.count);
-
-    return NextResponse.json(groups, {
-      headers: { "Cache-Control": "no-store, max-age=0" },
-    });
-  } catch (error) {
-    console.error("Inventory API error:", error);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  const { searchParams } = new URL(req.url);
+  const cellarId = searchParams.get("cellarId");
+  
+  // REQUIRE cellarId to prevent returning all inventory
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
   }
+  
+  // Get all SEALED doses grouped by coffee, dose type, and frozen state
+  // Sealed = FULL status in fill_sessions
+  const rows = await sql`
+    SELECT
+      c.id AS coffee_id,
+      c.coffee_name,
+      c.roaster,
+      dt.id AS dose_type_id,
+      dt.name AS dose_type_name,
+      dt.grams_per_dose,
+      COALESCE(v.is_frozen, false) AS is_frozen,
+      fs.roast_date,
+      COUNT(v.id)::int AS count,
+      json_agg(
+        json_build_object(
+          'id', v.id,
+          'vialCode', v.vial_code,
+          'doseTypeId', v.dose_type_id,
+          'isFrozen', COALESCE(v.is_frozen, false),
+          'frozenAt', v.frozen_at,
+          'sealedAt', fs.filled_at
+        ) ORDER BY fs.filled_at ASC
+      ) AS doses
+    FROM fill_sessions fs
+    JOIN vials v ON v.id = fs.vial_id
+    JOIN coffees c ON c.id = fs.coffee_id
+    JOIN dose_types dt ON dt.id = fs.dose_type_id
+    WHERE fs.status = 'FULL' AND c.cellar_id = ${cellarId}
+    GROUP BY c.id, c.coffee_name, c.roaster, dt.id, dt.name, dt.grams_per_dose, COALESCE(v.is_frozen, false), fs.roast_date
+    ORDER BY c.coffee_name, dt.name, COALESCE(v.is_frozen, false)
+  `;
+
+  const groups = rows.map((r) => ({
+    coffeeId: r.coffee_id,
+    coffeeName: r.coffee_name,
+    roaster: r.roaster,
+    doseTypeId: r.dose_type_id,
+    doseTypeName: r.dose_type_name,
+    gramsPerDose: r.grams_per_dose,
+    isFrozen: r.is_frozen,
+    roastDate: r.roast_date,
+    count: r.count,
+    doses: r.doses,
+  }));
+
+  return NextResponse.json(groups, {
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
 }
