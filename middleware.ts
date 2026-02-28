@@ -3,22 +3,26 @@ import { NextResponse } from "next/server";
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
-  const isLoginPage = req.nextUrl.pathname === "/login";
-  const isApiAuth = req.nextUrl.pathname.startsWith("/api/auth");
+  const pathname = req.nextUrl.pathname;
   
-  // Allow auth API routes
-  if (isApiAuth) {
+  // Public routes - no auth required
+  const isPublicRoute = 
+    pathname === "/login" || 
+    pathname === "/register" ||
+    pathname.startsWith("/api/auth");
+  
+  // Allow public routes
+  if (isPublicRoute) {
+    // Redirect to home if already logged in and trying to access auth pages
+    if (isLoggedIn && (pathname === "/login" || pathname === "/register")) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
     return NextResponse.next();
   }
 
-  // Redirect to login if not authenticated
-  if (!isLoggedIn && !isLoginPage) {
+  // Protected routes - require auth
+  if (!isLoggedIn) {
     return NextResponse.redirect(new URL("/login", req.url));
-  }
-
-  // Redirect to home if already logged in and trying to access login
-  if (isLoggedIn && isLoginPage) {
-    return NextResponse.redirect(new URL("/", req.url));
   }
 
   return NextResponse.next();

@@ -1,43 +1,48 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import Link from "next/link";
 import { Coffee, Loader2 } from "lucide-react";
 
-const ERROR_MESSAGES: Record<string, string> = {
-  Configuration: "Server configuration error. Please ensure AUTH_SECRET is set in environment variables.",
-  CredentialsSignin: "Invalid email or password.",
-  Default: "An error occurred during sign in.",
-};
-
-function LoginForm() {
+function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Handle error from URL params (e.g., redirected from Auth.js error)
-  useEffect(() => {
-    const errorParam = searchParams.get("error");
-    if (errorParam) {
-      setError(ERROR_MESSAGES[errorParam] || ERROR_MESSAGES.Default);
-    }
-  }, [searchParams]);
+  // Pre-fill email from invite link
+  const inviteEmail = searchParams.get("email");
+  if (inviteEmail && !email) {
+    setEmail(inviteEmail);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Use signIn which will auto-create the user if in allowed_users
       const result = await signIn("credentials", {
         email,
         password,
@@ -45,7 +50,11 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setError(result.error);
+        if (result.error === "Configuration") {
+          setError("Server configuration error. Please contact admin.");
+        } else {
+          setError("Registration failed. Your email may not be authorized.");
+        }
       } else {
         router.push("/");
         router.refresh();
@@ -64,7 +73,7 @@ function LoginForm() {
           {error}
         </div>
       )}
-      
+
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -76,6 +85,9 @@ function LoginForm() {
           required
           autoComplete="email"
         />
+        <p className="text-xs text-muted-foreground">
+          Your email must be pre-authorized by an admin.
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -83,32 +95,44 @@ function LoginForm() {
         <Input
           id="password"
           type="password"
-          placeholder="Your password"
+          placeholder="Create a password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          autoComplete="current-password"
+          minLength={6}
+          autoComplete="new-password"
         />
-        <p className="text-xs text-muted-foreground">
-          First time? Your password will be set on first login.
-        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword">Confirm Password</Label>
+        <Input
+          id="confirmPassword"
+          type="password"
+          placeholder="Confirm your password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+          minLength={6}
+          autoComplete="new-password"
+        />
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? (
           <>
             <Loader2 className="size-4 mr-2 animate-spin" />
-            Signing in...
+            Creating account...
           </>
         ) : (
-          "Sign In"
+          "Create Account"
         )}
       </Button>
     </form>
   );
 }
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
@@ -116,27 +140,30 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 size-12 rounded-full bg-primary/10 flex items-center justify-center">
             <Coffee className="size-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Bean Cellar</CardTitle>
+          <CardTitle className="text-2xl">Join Bean Cellar</CardTitle>
           <CardDescription>
-            Sign in to track your specialty coffee inventory
+            Create your account to start tracking coffee
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Suspense fallback={
-            <div className="space-y-4">
-              <div className="h-10 bg-muted animate-pulse rounded" />
-              <div className="h-10 bg-muted animate-pulse rounded" />
-              <div className="h-10 bg-muted animate-pulse rounded" />
-            </div>
-          }>
-            <LoginForm />
+          <Suspense
+            fallback={
+              <div className="space-y-4">
+                <div className="h-10 bg-muted animate-pulse rounded" />
+                <div className="h-10 bg-muted animate-pulse rounded" />
+                <div className="h-10 bg-muted animate-pulse rounded" />
+                <div className="h-10 bg-muted animate-pulse rounded" />
+              </div>
+            }
+          >
+            <RegisterForm />
           </Suspense>
         </CardContent>
         <CardFooter className="justify-center">
           <p className="text-sm text-muted-foreground">
-            New here?{" "}
-            <Link href="/register" className="text-primary hover:underline">
-              Create an account
+            Already have an account?{" "}
+            <Link href="/login" className="text-primary hover:underline">
+              Sign in
             </Link>
           </p>
         </CardFooter>
