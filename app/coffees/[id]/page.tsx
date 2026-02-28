@@ -26,7 +26,7 @@ import { CoffeePhotoGallery } from "@/components/coffee-photo-gallery";
 import { ArrowLeft, Edit, ExternalLink, Clock, ChevronDown, Coffee as CoffeeIcon, Droplets, Plus } from "lucide-react";
 import { StarRating } from "@/components/star-rating";
 import { toast } from "sonner";
-import { mutate } from "swr";
+import { mutate as globalMutate } from "swr";
 
 export default function CoffeeDetailPage({
   params,
@@ -38,7 +38,7 @@ export default function CoffeeDetailPage({
   const cellarId = currentCellar?.id;
   const cellarParam = cellarId ? `?cellarId=${cellarId}` : "";
   
-  const { data: coffee, isLoading, mutate } = useCoffee(id, cellarId);
+  const { data: coffee, isLoading, mutate: mutateCoffee } = useCoffee(id, cellarId);
   const { data: processMethods } = useProcessMethods();
   const { data: timeline } = useCoffeeTimeline(id, cellarId);
   const [showEdit, setShowEdit] = useState(false);
@@ -50,13 +50,18 @@ export default function CoffeeDetailPage({
   const handleRatingChange = async (newRating: number) => {
     if (!coffee || !cellarId) return;
     try {
-      await fetch(`/api/coffees/${id}${cellarParam}`, {
+      const res = await fetch(`/api/coffees/${id}${cellarParam}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...coffee, score: newRating }),
       });
-      mutate(`/api/coffees/${id}${cellarParam}`);
-      mutate(`/api/coffees${cellarParam}`);
+      if (!res.ok) {
+        throw new Error("Failed to save rating");
+      }
+      // Revalidate local hook data
+      mutateCoffee();
+      // Also revalidate the coffees list
+      globalMutate(`/api/coffees${cellarParam}`);
       toast.success(`Rated ${newRating} stars`);
     } catch {
       toast.error("Failed to update rating");
@@ -289,7 +294,7 @@ export default function CoffeeDetailPage({
             coffee={coffee}
             onSave={() => {
               setShowEdit(false);
-              mutate();
+              mutateCoffee();
             }}
             onCancel={() => setShowEdit(false)}
           />
