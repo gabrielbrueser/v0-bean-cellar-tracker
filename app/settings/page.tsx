@@ -35,8 +35,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Coffee, Clock, Beaker, Trash2, TestTube, Settings2, Pencil, AlertTriangle, Printer, LogOut, User } from "lucide-react";
+import { Coffee, Clock, Beaker, Trash2, TestTube, Settings2, Pencil, AlertTriangle, Printer, LogOut, User, Users, UserPlus, Mail } from "lucide-react";
 import Link from "next/link";
+import { CellarSwitcher } from "@/components/cellar-switcher";
 import { formatDistanceToNow } from "date-fns";
 
 interface Activity {
@@ -208,6 +209,30 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Cellar Management Card */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="size-4" />
+            Cellar
+          </CardTitle>
+          <CardDescription>
+            Switch between cellars or create a new one
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <CellarSwitcher />
+            <Link href="/settings/cellar">
+              <Button variant="outline" size="sm">
+                <UserPlus className="size-4 mr-2" />
+                Invite Members
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Vial Management Card */}
       <Card>

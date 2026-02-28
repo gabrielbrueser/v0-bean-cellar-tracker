@@ -67,3 +67,11 @@ export function useCoffeeTimeline(coffeeId: string | null) {
 export function useHomeData() {
   return useSWR("/api/home", fetcher);
 }
+
+export function useCellars() {
+  return useSWR("/api/cellars", fetcher);
+}
+
+export function useCellarInvites(cellarId: string | null) {
+  return useSWR(cellarId ? `/api/cellars/${cellarId}/invites` : null, fetcher);
+}
