@@ -7,6 +7,17 @@ export async function POST(req: Request) {
   const session = await auth();
   const userId = session?.user?.id || null;
   const sql = getDb();
+  
+  const { searchParams } = new URL(req.url);
+  const cellarId = searchParams.get("cellarId");
+  
+  // REQUIRE cellarId - never create brew_logs with NULL cellar_id
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
 
   const body = await req.json();
   const {
@@ -35,22 +46,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "brewFeedback must be 'fast', 'good', or 'slow'" }, { status: 400 });
   }
 
-  // Get the dose and its active fill session
+  // Get the dose and its active fill session - validate dose belongs to this cellar
   const doseRows = await sql`
     SELECT 
       v.id as vial_id,
       v.status,
+      v.cellar_id as vial_cellar_id,
       fs.id as fill_session_id,
-      fs.coffee_id,
-      c.cellar_id
+      fs.coffee_id
     FROM vials v
     LEFT JOIN fill_sessions fs ON fs.vial_id = v.id AND fs.status = 'FULL'
-    LEFT JOIN coffees c ON c.id = fs.coffee_id
-    WHERE v.id = ${doseId}
+    WHERE v.id = ${doseId} AND v.cellar_id = ${cellarId}
   `;
 
   if (doseRows.length === 0) {
-    return NextResponse.json({ error: "Dose not found" }, { status: 404 });
+    return NextResponse.json({ error: "Dose not found in this cellar" }, { status: 404 });
   }
 
   const dose = doseRows[0];
@@ -60,7 +70,6 @@ export async function POST(req: Request) {
   }
 
   const grindUnit = brewMethod === "espresso" ? "espresso-scale" : "comandante-clicks";
-  const cellarId = dose.cellar_id || null;
   const coffeeId = dose.coffee_id;
 
   // Start transaction-like operations

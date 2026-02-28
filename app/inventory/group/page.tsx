@@ -28,6 +28,7 @@ import {
   Coffee,
   ChevronRight
 } from "lucide-react";
+import { useCellarContext } from "@/lib/cellar-context";
 
 interface Dose {
   id: string;
@@ -103,8 +104,12 @@ function GroupDetailsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const groupKey = searchParams.get("key");
+  const { currentCellar } = useCellarContext();
   
-  const { data: groups, isLoading } = useSWR<InventoryGroup[]>("/api/inventory", fetcher);
+  // Cellar-scoped inventory URL
+  const inventoryUrl = currentCellar?.id ? `/api/inventory?cellarId=${currentCellar.id}` : null;
+  
+  const { data: groups, isLoading } = useSWR<InventoryGroup[]>(inventoryUrl, fetcher);
   const [isBrewDialogOpen, setIsBrewDialogOpen] = useState(false);
   const [isFreezeLoading, setIsFreezeLoading] = useState(false);
 
@@ -132,14 +137,19 @@ function GroupDetailsContent() {
 
   const handleFreezeToggle = async () => {
     if (!group) return;
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
     setIsFreezeLoading(true);
     const action = group.isFrozen ? "unfreeze" : "freeze";
     let successCount = 0;
     let failCount = 0;
+    const cellarParam = `cellarId=${currentCellar.id}`;
 
     for (const dose of group.doses) {
       try {
-        const res = await fetch(`/api/vials/${dose.id}/freeze`, {
+        const res = await fetch(`/api/vials/${dose.id}/freeze?${cellarParam}`, {
           method: "POST",
         });
         if (res.ok) successCount++;
@@ -151,8 +161,8 @@ function GroupDetailsContent() {
 
     if (successCount > 0) {
       toast.success(`${successCount} dose${successCount !== 1 ? "s" : ""} ${action === "freeze" ? "frozen" : "unfrozen"}`);
-      mutate("/api/inventory");
-      mutate("/api/home");
+      mutate(inventoryUrl);
+      mutate(`/api/home?${cellarParam}`);
       // After toggling, go back to inventory since group state changed
       router.push("/inventory");
     }

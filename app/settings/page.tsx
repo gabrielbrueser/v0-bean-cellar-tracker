@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useAllVials, useDoseTypes } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import { mutate } from "swr";
 import { toast } from "sonner";
 import {
@@ -52,7 +53,8 @@ interface VialWithDetails {
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const { data: vials, isLoading: vialsLoading } = useAllVials();
+  const { currentCellar, isLoading: cellarLoading } = useCellarContext();
+  const { data: vials, isLoading: vialsLoading } = useAllVials(currentCellar?.id);
   const { data: doseTypes } = useDoseTypes();
   const [showVialManager, setShowVialManager] = useState(false);
   const [vialToDelete, setVialToDelete] = useState<VialWithDetails | null>(null);
@@ -65,18 +67,23 @@ export default function SettingsPage() {
   const [isCreatingDose, setIsCreatingDose] = useState(false);
   const [createdDose, setCreatedDose] = useState<{ id: string; code: string } | null>(null);
 
+  // Helper for cellar-scoped SWR keys
+  const cellarParam = currentCellar?.id ? `cellarId=${currentCellar.id}` : "";
+  const vialsUrl = currentCellar?.id ? `/api/vials/all?${cellarParam}` : null;
+  const inventoryUrl = currentCellar?.id ? `/api/inventory?${cellarParam}` : null;
+
   const handleDeleteVial = async () => {
-    if (!vialToDelete) return;
+    if (!vialToDelete || !currentCellar?.id) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/vials/${vialToDelete.id}`, {
+      const res = await fetch(`/api/vials/${vialToDelete.id}?${cellarParam}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete");
       toast.success(`Dose ${vialToDelete.vialCode} deleted`);
-      mutate("/api/vials/all");
-      mutate("/api/inventory");
-      mutate("vials");
+      // Mutate with exact SWR keys
+      if (vialsUrl) mutate(vialsUrl);
+      if (inventoryUrl) mutate(inventoryUrl);
       setVialToDelete(null);
     } catch {
       toast.error("Failed to delete dose");
@@ -86,9 +93,13 @@ export default function SettingsPage() {
   };
 
   const handleCreateDose = async (doseTypeId: string) => {
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
     setIsCreatingDose(true);
     try {
-      const res = await fetch("/api/vials", {
+      const res = await fetch(`/api/vials?${cellarParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ doseTypeId }),
@@ -99,8 +110,9 @@ export default function SettingsPage() {
       }
       const dose = await res.json();
       setCreatedDose({ id: dose.id, code: dose.vialCode });
-      mutate("/api/vials/all");
-      mutate("/api/inventory");
+      // Mutate with exact SWR keys
+      if (vialsUrl) mutate(vialsUrl);
+      if (inventoryUrl) mutate(inventoryUrl);
       toast.success(`Dose ${dose.vialCode} created!`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't create dose. Please try again.");
@@ -110,7 +122,7 @@ export default function SettingsPage() {
   };
 
   const handleRenameVial = async () => {
-    if (!vialToRename || !newVialCode) return;
+    if (!vialToRename || !newVialCode || !currentCellar?.id) return;
     
     const code = newVialCode.trim().toUpperCase();
     
@@ -135,7 +147,7 @@ export default function SettingsPage() {
     
     setIsRenaming(true);
     try {
-      const res = await fetch(`/api/vials/${vialToRename.id}/rename`, {
+      const res = await fetch(`/api/vials/${vialToRename.id}/rename?${cellarParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newCode: code }),
@@ -145,8 +157,9 @@ export default function SettingsPage() {
         throw new Error(data.error || "Failed to rename");
       }
       toast.success(`Dose renamed to ${code}`);
-      mutate("/api/vials/all");
-      mutate("/api/inventory");
+      // Mutate with exact SWR keys
+      if (vialsUrl) mutate(vialsUrl);
+      if (inventoryUrl) mutate(inventoryUrl);
       setVialToRename(null);
       setNewVialCode("");
       setRenameError(null);
@@ -157,6 +170,23 @@ export default function SettingsPage() {
       setIsRenaming(false);
     }
   };
+
+  // Show loading state while cellar is loading
+  if (cellarLoading || !currentCellar?.id) {
+    return (
+      <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-foreground">Settings</h1>
+          <p className="text-sm text-muted-foreground">Loading cellar...</p>
+        </div>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6 pb-24">

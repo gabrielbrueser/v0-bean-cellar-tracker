@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCoffees, useDoseTypes } from "@/lib/hooks";
+import { useCellarContext } from "@/lib/cellar-context";
 import { CoffeeForm } from "@/components/coffee-form";
 
 interface FillVialDialogProps {
@@ -39,13 +40,17 @@ export function FillVialDialog({
   doseTypeId,
   hasActiveFill,
 }: FillVialDialogProps) {
-  const { data: coffees } = useCoffees();
+  const { currentCellar } = useCellarContext();
+  const { data: coffees } = useCoffees(currentCellar?.id);
   const { data: doseTypes } = useDoseTypes();
   const [coffeeId, setCoffeeId] = useState("");
   const [roastDate, setRoastDate] = useState("");
   const [grams, setGrams] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
   const [showNewCoffee, setShowNewCoffee] = useState(false);
+
+  // Helper for cellar-scoped SWR keys
+  const cellarParam = currentCellar?.id ? `cellarId=${currentCellar.id}` : "";
 
   // Set default grams from dose type when dialog opens
   const currentDoseType = doseTypes?.find((dt) => dt.id === doseTypeId);
@@ -64,25 +69,34 @@ export function FillVialDialog({
       toast.error("Please enter a valid grammage");
       return;
     }
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
     setLoading(true);
     try {
-      await fetch(`/api/vials/${vialId}/fill`, {
+      const res = await fetch(`/api/vials/${vialId}/fill?${cellarParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ coffeeId, doseTypeId, roastDate, gramsPerDose: grams }),
       });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to seal dose");
+      }
       toast.success("Dose sealed!", { description: `${grams}g ready for brewing.` });
-      mutate(`vial-${vialId}`);
-      mutate(`fill-active-${vialId}`);
-      mutate(`fill-sessions-${vialId}`);
-      mutate("inventory");
-      mutate("vials");
+      // Refresh with exact SWR keys
+      mutate(`/api/vials/${vialId}`);
+      mutate(`/api/vials/${vialId}/fill-sessions`);
+      mutate(`/api/inventory?${cellarParam}`);
+      mutate(`/api/vials?${cellarParam}`);
+      mutate(`/api/vials/all?${cellarParam}`);
       onOpenChange(false);
       setCoffeeId("");
       setRoastDate("");
       setGrams("");
-    } catch {
-      toast.error("Failed to seal dose");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to seal dose");
     } finally {
       setLoading(false);
     }
@@ -102,7 +116,7 @@ export function FillVialDialog({
             onSave={(newCoffee) => {
               setCoffeeId(newCoffee.id);
               setShowNewCoffee(false);
-              mutate("coffees");
+              mutate(`/api/coffees?${cellarParam}`);
             }}
             onCancel={() => setShowNewCoffee(false)}
           />

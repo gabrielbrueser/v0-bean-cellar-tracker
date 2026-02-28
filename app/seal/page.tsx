@@ -59,7 +59,7 @@ export default function SealCoffeePage() {
   const { currentCellar, isLoading: cellarLoading } = useCellarContext();
   const { data: coffees, isLoading: coffeesLoading } = useCoffees(currentCellar?.id);
   const { data: doseTypes, isLoading: doseTypesLoading } = useDoseTypes();
-  const { data: allVials, isLoading: vialsLoading } = useAllVials("EMPTY");
+  const { data: allVials, isLoading: vialsLoading } = useAllVials(currentCellar?.id, "EMPTY");
   
   // Combined loading for coffee list
   const isCoffeeListLoading = cellarLoading || (currentCellar?.id && coffeesLoading);
@@ -131,17 +131,23 @@ export default function SealCoffeePage() {
       toast.error("Please complete all fields");
       return;
     }
+    
+    if (!currentCellar?.id) {
+      toast.error("No cellar selected");
+      return;
+    }
 
     setIsSealing(true);
     let successCount = 0;
     const failed: string[] = [];
+    const cellarParam = `cellarId=${currentCellar.id}`;
 
     for (const doseId of selectedDoseIds) {
       const dose = emptyDosesForType.find((d: EmptyDose) => d.id === doseId);
       if (!dose) continue;
 
       try {
-        const res = await fetch(`/api/vials/${doseId}/fill`, {
+        const res = await fetch(`/api/vials/${doseId}/fill?${cellarParam}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -164,13 +170,12 @@ export default function SealCoffeePage() {
     setSealedCount(successCount);
     setFailedIds(failed);
 
-    // Refresh data (cellar-scoped)
-    const cellarParam = currentCellar?.id ? `?cellarId=${currentCellar.id}` : "";
-    mutate(`/api/inventory${cellarParam}`);
-    mutate("/api/vials/all");
-    mutate("/api/vials");
-    mutate(`/api/home${cellarParam}`);
-    mutate(`/api/coffees${cellarParam}`);
+    // Refresh data with exact SWR keys
+    mutate(`/api/inventory?${cellarParam}`);
+    mutate(`/api/vials/all?${cellarParam}`);
+    mutate(`/api/vials?${cellarParam}`);
+    mutate(`/api/home?${cellarParam}`);
+    mutate(`/api/coffees?${cellarParam}`);
 
     if (failed.length > 0) {
       toast.error(`Failed to seal: ${failed.join(", ")}`);

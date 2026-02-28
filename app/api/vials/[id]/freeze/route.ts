@@ -7,15 +7,24 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: vialId } = await params;
+  const cellarId = req.nextUrl.searchParams.get("cellarId");
   const sql = getDb();
 
-  // Get current freeze state
+  // REQUIRE cellarId
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
+
+  // Validate dose belongs to this cellar
   const rows = await sql`
-    SELECT is_frozen FROM vials WHERE id = ${vialId}
+    SELECT is_frozen FROM vials WHERE id = ${vialId} AND cellar_id = ${cellarId}
   `;
 
   if (rows.length === 0) {
-    return NextResponse.json({ error: "Dose not found" }, { status: 404 });
+    return NextResponse.json({ error: "Dose not found in this cellar" }, { status: 404 });
   }
 
   const isFrozen = rows[0].is_frozen;

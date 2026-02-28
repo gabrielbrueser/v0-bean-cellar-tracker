@@ -7,8 +7,36 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: vialId } = await params;
-  const { coffeeId, doseTypeId, roastDate, gramsPerDose } = await req.json();
+  const cellarId = req.nextUrl.searchParams.get("cellarId");
   const sql = getDb();
+
+  // REQUIRE cellarId
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
+
+  // Validate dose belongs to this cellar
+  const vialRows = await sql`SELECT * FROM vials WHERE id = ${vialId} AND cellar_id = ${cellarId}`;
+  if (vialRows.length === 0) {
+    return NextResponse.json(
+      { error: "Dose not found in this cellar" },
+      { status: 404 }
+    );
+  }
+
+  const { coffeeId, doseTypeId, roastDate, gramsPerDose } = await req.json();
+
+  // Validate coffee belongs to this cellar
+  const coffeeRows = await sql`SELECT * FROM coffees WHERE id = ${coffeeId} AND cellar_id = ${cellarId}`;
+  if (coffeeRows.length === 0) {
+    return NextResponse.json(
+      { error: "Coffee does not belong to this cellar" },
+      { status: 400 }
+    );
+  }
 
   // Archive any active fill session
   await sql`

@@ -1,15 +1,33 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { auth } from "@/lib/auth";
 
 // POST /api/vials/:id/use — mark a vial as used
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   const { id: vialId } = await params;
+  const cellarId = req.nextUrl.searchParams.get("cellarId");
   const sql = getDb();
+
+  // REQUIRE cellarId
+  if (!cellarId) {
+    return NextResponse.json(
+      { error: "cellarId query param is required" },
+      { status: 400 }
+    );
+  }
+
+  // Validate dose belongs to this cellar
+  const vialRows = await sql`SELECT * FROM vials WHERE id = ${vialId} AND cellar_id = ${cellarId}`;
+  if (vialRows.length === 0) {
+    return NextResponse.json(
+      { error: "Dose not found in this cellar" },
+      { status: 404 }
+    );
+  }
 
   // Parse request body for brew type and grind size
   let brewType = "espresso"; // default
