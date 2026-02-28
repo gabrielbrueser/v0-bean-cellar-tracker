@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     JOIN vials v ON v.id = fs.vial_id
     JOIN coffees c ON c.id = fs.coffee_id
     JOIN dose_types dt ON dt.id = fs.dose_type_id
-    WHERE fs.status = 'FULL' AND c.cellar_id = ${cellarId}
+    WHERE fs.status = 'FULL' AND c.cellar_id = ${cellarId}::uuid
     GROUP BY c.id, c.coffee_name, c.roaster, dt.id, dt.name, dt.grams_per_dose, COALESCE(v.is_frozen, false), fs.roast_date
     ORDER BY c.coffee_name, dt.name, COALESCE(v.is_frozen, false)
   `;
