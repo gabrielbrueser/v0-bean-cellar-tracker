@@ -1,21 +1,24 @@
-import { sql } from '@vercel/postgres';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+import { getDb } from "@/lib/db";
+import { requireCellarId } from "@/lib/api/cellar";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const cellarId = searchParams.get('cellarId');
-
-  if (!cellarId) {
-    return NextResponse.json({ error: 'cellarId is required' }, { status: 400 });
+export async function GET(req: NextRequest) {
+  let cellarId: string;
+  try {
+    cellarId = requireCellarId(req);
+  } catch (response) {
+    return response as NextResponse;
   }
 
+  const sql = getDb();
+
   try {
-    const { rows } = await sql`
+    const rows = await sql`
       SELECT * FROM vials 
       WHERE cellar_id = ${cellarId}::uuid
     `;
     return NextResponse.json(rows);
   } catch (error) {
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 }
