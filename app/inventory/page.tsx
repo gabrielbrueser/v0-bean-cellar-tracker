@@ -114,10 +114,13 @@ function getGroupKey(group: InventoryGroup): string {
 
 export default function InventoryPage() {
   const router = useRouter();
-  const { currentCellar } = useCellarContext();
+  const { currentCellar, isLoading: cellarLoading } = useCellarContext();
   const [filter, setFilter] = useState<FilterType>("all");
   const inventoryUrl = currentCellar?.id ? `/api/inventory?cellarId=${currentCellar.id}` : "/api/inventory";
-  const { data: groups, isLoading } = useSWR<InventoryGroup[]>(inventoryUrl, fetcher);
+  const { data: groups, isLoading: inventoryLoading } = useSWR<InventoryGroup[]>(inventoryUrl, fetcher);
+  
+  // Combined loading: cellar loading OR (we have cellar but inventory still loading)
+  const isLoading = cellarLoading || (currentCellar?.id && inventoryLoading);
   const [selectedGroup, setSelectedGroup] = useState<InventoryGroup | null>(null);
   const [isBrewDialogOpen, setIsBrewDialogOpen] = useState(false);
   const [isFreezeLoading, setIsFreezeLoading] = useState(false);

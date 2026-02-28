@@ -83,8 +83,11 @@ export default function HomePage() {
   const [showScanner, setShowScanner] = useState(false);
   const [showFreezeConfirm, setShowFreezeConfirm] = useState(false);
   const [isFreezing, setIsFreezing] = useState(false);
-  const { currentCellar } = useCellarContext();
-  const { data, isLoading, mutate: mutateHome } = useHomeData(currentCellar?.id);
+  const { currentCellar, isLoading: cellarLoading } = useCellarContext();
+  const { data, isLoading: homeLoading, mutate: mutateHome } = useHomeData(currentCellar?.id);
+  
+  // Combined loading: cellar loading OR (we have cellar but home data still loading)
+  const isLoading = cellarLoading || (currentCellar?.id && homeLoading);
 
   const handleFreezeAll = async () => {
     if (!data?.staleSoonDoseIds?.length || !currentCellar?.id) return;

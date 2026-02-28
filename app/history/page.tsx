@@ -47,9 +47,12 @@ interface GroupedBrews {
 }
 
 export default function HistoryPage() {
-  const { currentCellar } = useCellarContext();
-  const { data: brewLogs, isLoading, mutate: mutateBrewLogs } = useBrewLogs(currentCellar?.id, 100);
+  const { currentCellar, isLoading: cellarLoading } = useCellarContext();
+  const { data: brewLogs, isLoading: brewsLoading, mutate: mutateBrewLogs } = useBrewLogs(currentCellar?.id, 100);
   const { data: stats, mutate: mutateStats } = useBrewStats(currentCellar?.id);
+  
+  // Combined loading: cellar loading OR (we have cellar but brews still loading)
+  const isLoading = cellarLoading || (currentCellar?.id && brewsLoading);
   
   const [brewToDelete, setBrewToDelete] = useState<BrewLog | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);

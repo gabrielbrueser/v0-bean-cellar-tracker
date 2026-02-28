@@ -56,10 +56,13 @@ interface EmptyDose {
 
 export default function SealCoffeePage() {
   const router = useRouter();
-  const { currentCellar } = useCellarContext();
+  const { currentCellar, isLoading: cellarLoading } = useCellarContext();
   const { data: coffees, isLoading: coffeesLoading } = useCoffees(currentCellar?.id);
   const { data: doseTypes, isLoading: doseTypesLoading } = useDoseTypes();
   const { data: allVials, isLoading: vialsLoading } = useAllVials("EMPTY");
+  
+  // Combined loading for coffee list
+  const isCoffeeListLoading = cellarLoading || (currentCellar?.id && coffeesLoading);
 
   // Flow state
   const [step, setStep] = useState<Step>("coffee");
@@ -189,7 +192,7 @@ export default function SealCoffeePage() {
   };
 
   // Loading state
-  if (coffeesLoading || doseTypesLoading || vialsLoading) {
+  if (isCoffeeListLoading || doseTypesLoading || vialsLoading) {
     return (
       <div className="mx-auto max-w-lg px-4 pt-6 pb-24">
         <Skeleton className="h-8 w-32 mb-4" />
